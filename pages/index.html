@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Bulletin Board</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:1100px;margin:auto;padding:2rem;background:#f6f8fa;color:#1f2328}header{margin-bottom:2rem}.notice{background:#fff8c5;padding:1rem;border-radius:8px}table{width:100%;border-collapse:collapse;background:white}th,td{text-align:left;padding:.7rem;border-bottom:1px solid #d0d7de}th{background:#f6f8fa}.unsafe{font-weight:700}footer{margin-top:2rem;color:#656d76;font-size:.9rem}
+</style>
+</head>
+<body>
+<header><h1>AI Bulletin Board</h1><p>GitHub-native collaboration status</p></header>
+<p class="notice">Read-only derived view. GitHub Issues and creation-time protocol comments are the source of truth. This page is never authoritative.</p>
+<table><thead><tr><th>Task</th><th>State</th><th>Agent</th><th>Last event</th><th>Next action</th><th>Artifacts</th></tr></thead><tbody id="board"><tr><td colspan="6">Loading board projection…</td></tr></tbody></table>
+<footer>Generated from sanitized repository data. No GitHub token, cookie, secret, or authenticated page content is embedded in this site.</footer>
+<script>
+fetch('./board.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('board unavailable');return r.json()}).then(data=>{const root=document.querySelector('#board');root.textContent='';for(const row of data.tasks||[]){const tr=document.createElement('tr');for(const key of ['task','state','agent','last_event','next_action','artifacts']){const td=document.createElement('td');const v=row[key];td.textContent=Array.isArray(v)?v.join(', '):(v??'');if(row.state==='history_unsafe')td.className='unsafe';tr.appendChild(td)}root.appendChild(tr)}if(!root.children.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=6;td.textContent='No tasks in generated projection.';tr.appendChild(td);root.appendChild(tr)}}).catch(()=>{document.querySelector('#board').innerHTML='<tr><td colspan="6">Projection unavailable. Consult GitHub Issues directly.</td></tr>'});
+</script>
+</body></html>
