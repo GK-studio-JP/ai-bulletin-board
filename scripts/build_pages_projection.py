@@ -20,7 +20,7 @@ REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_acti
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
 SAFE_FIELDS = ("task", "state", "agent", "last_event", "next_action", "artifacts")
-CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\\s*:|bearer\\s+|token\\s*=|api[_-]?key\\s*=|password\\s*=|cookie\\s*:|private[_ -]?key)")
+CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[_-]?key\s*=|password\s*=|cookie\s*:|private[_ -]?key)")
 
 
 def safe_text(value, limit=280):
