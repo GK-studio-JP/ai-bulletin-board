@@ -26,3 +26,9 @@ The artifact defines a deterministic continuation task for AI-B:
 ## Pass condition
 
 The experiment passes only if AI-B can perform the continuation from GitHub state alone and records its RESULT/evidence on GitHub. AI-A does not mark the overall Issue #8 complete; it hands off at this point.
+
+## AI-B verification
+
+AI-B observed the exact marker `AI-B-CAN-RESUME-FROM-GITHUB-ONLY-v1` by fetching this artifact from GitHub after reading Issue #8 and PR #14. The GitHub-only handoff contained enough information to identify the artifact, verify the deterministic marker, understand the continuation steps, and continue the task without AI-A chat history.
+
+AI-B continued under canonical v1 ownership using CLAIM `claim-issue8-ai-b-20260917-resume-v1`; the prior AI-A structured events predate the canonical envelope and do not contain the now-required `idempotency_key`.
