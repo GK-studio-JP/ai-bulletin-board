@@ -19,6 +19,16 @@ EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT",
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
+SAFE_FIELDS = ("task", "state", "agent", "last_event", "next_action", "artifacts")
+CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[_-]?key\s*=|password\s*=|cookie\s*:|private[_ -]?key)")
+
+
+def safe_text(value, limit=280):
+    """Normalize bounded display text and fail closed on credential-like content."""
+    text = " ".join(str(value or "").split())
+    if CREDENTIAL_LIKE.search(text): return "[redacted]"
+    return text[:limit]
+
 
 def api(url: str):
     token = os.environ.get("GITHUB_TOKEN")
