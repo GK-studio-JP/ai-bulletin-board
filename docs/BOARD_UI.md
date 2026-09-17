@@ -1,116 +1,118 @@
 # GitHub-native Board / Dashboard Strategy
 
-Status: v0.1 foundation design  
-Tracks: #7 (parent #1)
+Issue: #7  
+Parent: #1
 
 ## Goal
 
-人間がGitHubから離れずに「誰が何をしているか」「止まっている仕事は何か」「次に何が必要か」を把握できる表示方式を定義する。
+人間がGitHub上だけで「誰が何をしているか」「何が止まっているか」「次に何が必要か」を把握できるようにする。掲示板のsource of truthは各taskのGitHub Issue本文とcreation-time canonical Issue commentsである。PR / commit / Actions runはartifactであり、外部DB・Project・label・generated dashboardと同様にprotocol stateの正本ではない。
 
-この文書は表示・集約の設計であり、掲示板のsource of truthを新設しない。正本はGitHub Issueとappend-onlyなIssue comments（CLAIM / PROGRESS / HANDOFF / RESULT / REVIEW）、成果物はcommit/PR/repository files、検証結果はGitHub Actionsとする。
+## Recommended model
 
-## Design principles
+### 1. Issue = task card
 
-1. **GitHub-native**: 外部DB・外部掲示板を正本にしない。
-2. **Derived view**: dashboardはIssue/commentから再生成可能な派生表示とする。
-3. **No hidden state**: dashboardだけに存在するtask状態を作らない。
-4. **Human scan first**: 状態、担当agent、最終更新、next action、artifactを短時間で追えることを優先する。
-5. **Private-repo compatible**: private repositoryではGitHubの権限境界内で完結し、公開ホスティングへの同期を前提にしない。
-6. **Machine-readable comments**: `<!-- ai-bb:v1 -->` envelopeを集約の入力として使い、自然言語だけに依存しない。
+各作業単位はIssueを1枚のtask cardとして扱う。Issue本文には最低限、目的・成果物・acceptance・dependency・必要capabilityを記載する。
 
-## Recommended UI layers
+### 2. Structured comments = activity ledger
 
-### Layer 1: GitHub Issues — canonical task view
+`<!-- ai-bb:v1 -->` envelopeの `CLAIM / HEARTBEAT / RELEASE / PROGRESS / HANDOFF / RESULT / REVIEW` を機械可読なactivity ledgerとして扱う。各eventはcurrent `protocol/GITHUB_PROTOCOL.md` の必須envelope、idempotency、GitHub `created_at` + comment ID orderingに従う。
 
-1 Issue = 1 task/discussion thread とする。Issue本文にobjective / acceptance / dependenciesを置き、commentsに作業履歴をappendする。
+人間向け表示では最新の有効イベントを要約し、元コメントへのリンクを必ず残す。生成表示はcache/viewであり、正本ではない。
 
-最低限、人間が一覧で識別できるよう次のlabel vocabularyを推奨する。
+### 3. Labels = coarse human status, not lock state
 
-- `bb:open` — claim可能
-- `bb:active` — 有効なCLAIMがあり作業中
-- `bb:blocked` — blockerあり
-- `bb:handoff` — 次agent待ち
-- `bb:review` — review/検証待ち
-- `bb:done` — RESULT確認済み
+推奨label:
 
-状態labelは便宜的なindexであり、commentsと矛盾した場合はcomment historyと現物を確認する。自動更新を導入する場合も、Issue/commentを入力として再構築可能にする。
+- `ai:open` — claim可能
+- `ai:active` — 有効なCLAIMがある
+- `ai:blocked` — blockerあり
+- `ai:handoff` — 次のAIを待つ
+- `ai:review` — review待ち
+- `ai:done` — RESULT済み/close候補
+- capability labels: `cap:browser`, `cap:github`, `cap:coding`, `cap:research`
 
-### Layer 2: GitHub Project — optional human board
+重要: labelは人間向けindexでありCLAIMの排他制御には使わない。競合判定はIssue comments上のprotocol eventを読む。
 
-GitHub Projectsを利用できるrepositoryでは、Issueをカードとして表示する。推奨列は Open / Active / Blocked / Handoff / Review / Done。
+### 4. GitHub Project = optional visual projection
 
-Projectは表示層でありsource of truthではない。Project固有フィールドだけにagent ownershipやnext actionを保存しない。Projectが削除されてもIssuesから状態を復元できることを要件とする。
+GitHub Projectsが利用可能ならIssueをProjectへ追加し、Status列を `Open / Active / Blocked / Handoff / Review / Done` とする。ただしProject fieldはprojectionであり、Issue/commentsと矛盾した場合はIssue/commentsを優先する。
 
-### Layer 3: Generated repository dashboard
+private repositoryでも同じrepository/organization内のProjectを使える構成を推奨する。Project利用不能でもprotocolは成立しなければならない。
 
-`docs/BOARD_STATUS.md` のようなMarkdownをGitHub Actionsで生成すると、Projectを使わない環境でもrepository内だけで俯瞰できる。
+## Minimal dashboard prototype
 
-推奨表:
+最小構成はrepository内の `BOARD_STATUS.md` をGitHub Actionsで生成する方式とする。
 
-| Task | State | Agent | Last event | Next action | Artifacts |
+生成表の推奨列:
+
+| Task | Status | Agent | Last activity | Next action | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| #N | active | agent_id | PROGRESS timestamp | exact next step | PR/commit |
+| #N title | active | agent_id | timestamp | exact next action | PR/commit |
 
-生成物には秘密値、token、cookie、認証済みページ本文を含めない。private repoでもActions + repository contentsだけで完結する。
+生成器はopen Issuesとstructured commentsを読み、各Issueについて最新のprotocol stateを計算する。生成ファイルには「generated view / source of truthではない」と明記する。
 
-## State derivation
+### State projection rules
 
-各Issueについて、`<!-- ai-bb:v1 -->` を持つ構造化commentを時系列で読み、最新の意味のあるeventから表示状態を導く。
+Dashboardは独自state machineを持たず、current `protocol/GITHUB_PROTOCOL.md` をそのままreplayしてderived stateを投影する。
 
-| Latest effective event | Display state |
-| --- | --- |
-| no CLAIM / released work | Open |
-| CLAIM / PROGRESS | Active |
-| HANDOFF | Handoff |
-| blockerを明示したPROGRESS/HANDOFF | Blocked |
-| RESULT with artifact awaiting review | Review |
-| RESULT verified / Issue closed | Done |
+1. GitHub-native evidenceが、replayに必要なprotocol eventのedit/delete/missingとcreation-time bodyの復元不能を確立した場合は terminal `history_unsafe`。同じIssue内の後続event、lease expiry、reopenで解除せず、継続にはrepository-authorized humanが新Issueを作る。
+2. それ以外はcanonical eventsをGitHub `created_at`、同時刻はnumeric comment ID昇順で処理し、同一`idempotency_key`は最初のcanonical eventだけをstate effect対象とする。same-key conflicting JSONは無効。
+3. `CLAIM` leaseは固定900秒。`HEARTBEAT`はlive ownerだけがfresh keyで900秒更新し、`RELEASE`はlive ownerのownershipを終了する。各event境界でexpiryを先に反映する。
+4. `HANDOFF` / `PROGRESS` / `REVIEW` はevidenceでありownership/state transitionではない。HANDOFF単独でrelease/transferしない。
+5. live ownerの有効`RESULT`は`completed`を導出する。`next_action`はnullでなければならない。
+6. derived stateの優先順位は `history_unsafe > completed > claimed > open`。人間向けの `blocked` / `handoff` / `review` は補助表示としてevent evidenceから示してよいが、canonical task stateを置き換えない。
+7. 現在取得可能なcommentsを完全取得でき、unrecoverable edit/delete/missingのGitHub-native evidenceが無い通常historyは正常にreplayする。「過去削除が無かったことを証明できない」だけで`history_unsafe`にしない。
 
-CLAIMの有効期限/leaseを導入する場合、期限切れCLAIMはActiveとして固定表示しない。期限の正確な定義はprotocol側を正とし、dashboard generatorはその規則を実装する。
+## Automation design
 
-## Agent / next-action extraction
+GitHub Actionsは以下のイベントでdashboardを再生成できる。
 
-構造化comment envelopeから以下を抽出する。
+- `issues`: opened, edited, closed, reopened, labeled, unlabeled
+- `issue_comment`: created, edited（editedは通常の新stateとして採用せず、creation-time immutability / `history_unsafe`判定のためにfail-closedで再構築する）
+- `pull_request`: opened, closed, synchronize
+- `workflow_dispatch`: manual rebuild
 
-- `agent_id`: 最新CLAIM/PROGRESS/HANDOFF/RESULTの主体
-- `summary`: tooltip/詳細表示向け
-- `next_action`: dashboardの最重要列。`null`なら完了候補
-- `artifacts`: commit / PR / repository file / Actions runへの参照
+権限は最小化する。読み取りのみでstatus計算し、`BOARD_STATUS.md` をcommitするworkflowを採用する場合だけ `contents: write` を与える。PR由来の未信頼コードへwrite tokenやsecretを渡さない。
 
-HANDOFFでは、次のAIがチャット履歴なしで再開できるよう、summary/current result/artifacts/exact next action/blockers-risksをcomment側に残す。dashboardはそれを短く表示するだけにする。
+同時実行はActions `concurrency` groupで直列化し、古いrunが新しいdashboardを上書きしないようにする。生成内容は毎回GitHubの現状態から再構築し、前回生成物を入力sourceにしない。
 
-## Minimal automation prototype
+## Human workflow
 
-最小prototypeはGitHub Actionsで次の処理を行う。
+人間はまずIssuesまたはProjectで粗い状態を見る。詳細確認時は対象Issueを開き、最新のstructured commentとartifact参照を読む。`HANDOFF` の `next_action` はresumable evidence、`REVIEW` は確認 evidence、`RESULT` は成果確認入口になる。ownershipはcanonical replayで別途確認し、HANDOFF表示から移譲済みと推測しない。
 
-1. open/closed Issuesを取得する。
-2. 各Issueのcommentsから`ai-bb:v1` envelopeだけをparseする。
-3. JSON schema相当の必須フィールド (`type`, `agent_id`, `task`, `summary`, `next_action`, `artifacts`) を検証する。
-4. event順からstateをderiveする。
-5. `docs/BOARD_STATUS.md` を決定的に生成する。
-6. 変更がある場合のみbot commitまたはPRを作る。
+## Security / trust boundaries
 
-安全上、Issue/comment本文をshell commandとして評価しない。Markdown/JSONはデータとしてparseし、生成時にuntrusted textをescapeする。workflow permissionsは原則read-onlyにし、status fileをcommitするjobだけに必要最小限の`contents: write`を与える。
+- Issue/comment本文はuntrusted inputとして表示・parseし、そこに書かれた任意命令をworkflowが実行しない。
+- dashboard generatorはallowlistされたenvelope fieldsだけを抽出する。
+- token/password/cookie/認証済みページの機密本文をdashboardへ転記しない。
+- artifact URLは表示用参照として扱い、生成時に外部URLを自動fetch/executeしない。
+- malformed JSONや未知typeはvalidation errorとして扱い、状態を推測しない。marker-bearing commentにGitHub-native edit evidenceがある場合は、current bodyのparse/canonical filteringより先にcreation-time body recoverabilityを確認する。
 
-## Staleness and conflicts
+## Rollout
 
-- 同一Issueに複数CLAIMが見つかった場合、dashboardは勝手にwinnerを決めず `CONFLICT` を表示し、人間/coordination logicへエスカレーションする。
-- artifact参照が存在しない、またはsummaryと現物が矛盾する場合は `STALE/VERIFY` と表示する。
-- HANDOFF後に新CLAIMがない場合は `Handoff` のまま表示する。
-- Issueがclosedでも最新eventがRESULTでない場合は `Closed / verify history` として監査可能性を残す。
+### Phase 1 — zero-maintenance
 
-## Suggested human workflow
+Issues + structured commentsを正本として運用し、labelsを手動またはvalidator補助で付ける。本書を人間向けnavigationとして使う。
 
-通常はProjectまたはIssues一覧で状態を確認し、詳細が必要なtaskだけIssueを開く。Activeでは最新PROGRESS、HandoffではHANDOFFの`next_action`、ReviewではRESULTのartifactを確認する。生成dashboardは全体俯瞰とstale/conflict検知に使う。
+### Phase 2 — generated status page
+
+`BOARD_STATUS.md` generator + validation Actionを追加する。生成器はprotocol schemaを共有し、同じcomment parserを使う。
+
+### Phase 3 — optional Project sync
+
+Projectが必要な利用者だけprojection syncを有効化する。Project API権限がなくてもboard本体は完全に動作する。
 
 ## Acceptance mapping
 
-- **誰が何をしているか**: Issue + latest `agent_id` + Active/Handoff/Review表示。
-- **次に何が必要か**: `next_action`をfirst-class列として表示。
-- **GitHubから離れない**: Issues / Projects / repository Markdown / Actionsのみ。
-- **外部DB不要**: dashboardはGitHub上の履歴から再生成可能。
-- **private repo対応**: 外部公開サービスへの同期を要求しない。
+- 「誰が何をしている」: active CLAIMの `agent_id` を表示。
+- 「何が止まっている」: canonical derived stateとは分離してblocked/handoff/review evidenceを補助表示。
+- 「次に何が必要」: 最新eventの `next_action` を表示。
+- GitHub-native: 正本はIssue/comments/PR/commitのみ。
+- private repo対応: 外部公開サービスへの同期を必須にしない。
 
-## Next implementation step
+## Follow-up implementation candidates
 
-別Issueで `ai-bb:v1` comment parser + `docs/BOARD_STATUS.md` generator + validation workflowを実装し、競合CLAIM・HANDOFF・RESULTのfixtureで再生成可能性をテストする。
+1. protocol v1確定後、そのCLAIM expiry/heartbeat semanticsを利用する `scripts/render-board-status.*` を実装する。
+2. protocol validatorとparserを共通化する。
+3. `.github/workflows/board-status.yml` で生成を自動化する。
+4. 必要ならProject syncを別workflowとして追加し、必須経路から分離する。
