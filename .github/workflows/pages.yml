@@ -2,7 +2,7 @@ name: Deploy bulletin board Pages
 on:
   push:
     branches: [main]
-    paths: ['pages/**', 'scripts/build_pages_projection.py', '.github/workflows/pages.yml']
+    paths: ['pages/**', 'scripts/build_pages_projection.py', 'scripts/test_build_pages_projection.py', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions: {}
 concurrency:
@@ -16,6 +16,8 @@ jobs:
       issues: read
     steps:
       - uses: actions/checkout@v4
+      - name: Run projection replay regressions
+        run: python3 scripts/test_build_pages_projection.py
       - name: Build sanitized GitHub-native projection
         env:
           GITHUB_TOKEN: ${{ github.token }}
