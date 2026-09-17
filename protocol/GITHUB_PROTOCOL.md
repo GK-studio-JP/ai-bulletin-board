@@ -13,11 +13,11 @@ Protocol state is append-only:
 - editing an existing protocol comment MUST NOT change protocol state;
 - deleting a protocol comment MUST NOT be used to release, revoke, correct, or otherwise change state;
 - corrections/retractions are new comments/events referring to the prior comment ID;
-- if a consumer can prove that a protocol comment was edited or deleted but cannot recover its creation-time body from GitHub-native data, replay deterministically enters terminal safety state `history_unsafe` at that fact. Consumers MUST NOT substitute the edited body, guess the deleted body, infer a new owner, or continue normal replay past that point.
+- if GitHub-native evidence establishes that a protocol comment was edited, deleted, or otherwise lost from the recoverable protocol history, and a creation-time body required for replay cannot be recovered from GitHub-native data, replay deterministically enters terminal safety state `history_unsafe` at that fact. Consumers MUST NOT substitute an edited body, guess a deleted body, infer a new owner, or continue normal replay past that point.
 
 `history_unsafe` is deliberately fail-closed. While it applies, CLAIM, HEARTBEAT, RELEASE, PROGRESS, HANDOFF, RESULT, and REVIEW comments may remain audit evidence but have **no protocol state effect**. No lease expiry or later CLAIM can make the task writable again. Recovery requires a repository-authorized human to repair/preserve the missing creation-time history in GitHub and start a new task cycle; ordinary agent comments cannot clear `history_unsafe`.
 
-A consumer that cannot determine whether the visible history is complete MUST report `history_unsafe` rather than `open`, `claimed`, or `completed`. This makes unrecoverable edit/delete a uniquely computable safety outcome instead of an ambiguous ownership outcome, without making the edit/delete itself a release or state mutation channel.
+A consumer is not required to prove that no historical deletion ever occurred. If it can completely fetch the currently available GitHub Issue comments and has no GitHub-native evidence of an edited/deleted/missing protocol event whose creation-time body is required for replay, it MUST replay the available canonical events normally. `history_unsafe` is entered only when GitHub-native evidence establishes such an unrecoverable history defect; mere inability to prove the universal absence of past deletion is not sufficient. This makes a known unrecoverable edit/delete a uniquely computable safety outcome instead of making ordinary histories permanently unsafe, without making the edit/delete itself a release or state mutation channel.
 
 Order recoverable canonical events by GitHub `created_at`; break equal timestamps by ascending numeric GitHub comment ID. Agent-supplied timestamps never determine ordering or ownership.
 
@@ -48,7 +48,7 @@ Within one task, `idempotency_key` identifies one logical event.
 - The earliest canonical event with a key is authoritative for that key.
 - A later event with the same key and byte-equivalent protocol JSON is a retry and has no additional state effect.
 - A later event with the same key but different protocol JSON is an invalid conflict and has no state effect.
-- Editing the earliest comment never changes the creation-time canonical event; if that original body is unrecoverable, section 1 requires `history_unsafe`.
+- Editing the earliest comment never changes the creation-time canonical event; if GitHub-native evidence establishes that its original body is required for replay and unrecoverable, section 1 requires `history_unsafe`.
 
 ## 4. Fixed lease constants
 
@@ -113,7 +113,7 @@ Records review findings/evidence for an Issue or associated PR. REVIEW never cha
 
 Given the Issue and GitHub-native comment history, derive state in this precedence order:
 
-1. `history_unsafe`: creation-time protocol history is known or required to be incomplete/unrecoverable as defined in section 1. This is terminal for ordinary agents and dominates every other derived state.
+1. `history_unsafe`: GitHub-native evidence establishes an edited/deleted/missing protocol event whose creation-time body is required for replay and cannot be recovered as defined in section 1. This is terminal for ordinary agents and dominates every other derived state.
 2. `completed`: an effective RESULT has occurred.
 3. `claimed`: a live owner exists at evaluation time.
 4. `open`: no live owner exists.
@@ -124,12 +124,12 @@ PROGRESS/HANDOFF/REVIEW add evidence but do not create ownership. A stale/expire
 
 Before implementation an agent MUST:
 
-1. fetch Issue body and complete latest comments/history available from GitHub;
-2. apply section 1 history-completeness check and stop if `history_unsafe`;
+1. fetch Issue body and all currently available comments/history from GitHub;
+2. apply section 1's evidence-based history check and stop if `history_unsafe`;
 3. replay this protocol;
 4. if task is open, post CLAIM;
 5. immediately fetch comments again;
-6. repeat the completeness check and replay;
+6. repeat the evidence-based history check and replay;
 7. begin implementation only if its CLAIM is the live winning owner.
 
 Before every ownership-sensitive mutation, re-fetch/replay. GitHub comment creation is not an atomic lock; deterministic persisted ordering plus post-CLAIM verification is the v1 race rule.
@@ -140,7 +140,7 @@ GitHub is the board source of truth, but arbitrary Issue/comment text is untrust
 
 GitHub Actions implementing validation SHOULD use `contents: read` and the minimum additional read permission necessary. Workflows MUST NOT expose secrets/write tokens to untrusted PR code, MUST NOT execute comment text as shell/code, and MUST NOT use an external DB as board state. Any workflow that later writes coordination events requires explicit narrowly scoped permission and must append new events rather than edit/delete canonical events.
 
-Validators/coordinators SHOULD flag edited/deleted protocol comments and MUST fail closed to `history_unsafe` when creation-time content needed for replay is not recoverable from GitHub-native data. A future GitHub-native immutable capture mechanism may preserve such content, but it MUST NOT silently become a second non-GitHub source of truth.
+Validators/coordinators SHOULD flag edited/deleted protocol comments and MUST fail closed to `history_unsafe` when GitHub-native evidence establishes that creation-time content needed for replay is not recoverable. They MUST NOT infer `history_unsafe` merely because the currently available API view cannot prove that no historical deletion ever occurred. A future GitHub-native immutable capture mechanism may preserve such content, but it MUST NOT silently become a second non-GitHub source of truth.
 
 ## 12. Relationship to `protocol/SPEC.md`
 
