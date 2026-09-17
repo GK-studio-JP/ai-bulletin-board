@@ -146,6 +146,19 @@ def replay(issue, comments, now):
 def safe_artifacts(items):
     return [x for x in items if SAFE_ARTIFACT.fullmatch(x)][:8]
 
+def project_row(issue, state, owner, last):
+    """Explicit whitelist boundary between GitHub payloads and Pages JSON."""
+    p = last[2] if last else {}
+    row = {
+        "task": f"#{issue['number']}",
+        "state": state,
+        "agent": safe_text(owner or "", 160),
+        "last_event": p.get("type", "") if p.get("type") in EVENT_TYPES else "",
+        "next_action": safe_text(p.get("next_action") or ""),
+        "artifacts": safe_artifacts(p.get("artifacts", [])),
+    }
+    return {key: row[key] for key in SAFE_FIELDS}
+
 
 def main():
     repo = os.environ.get("GITHUB_REPOSITORY")
@@ -158,15 +171,7 @@ def main():
     for issue in issues:
         comments = paged(issue["comments_url"])
         state, owner, last = replay(issue, comments, now)
-        p = last[2] if last else {}
-        rows.append({
-            "task": f"#{issue['number']}",
-            "state": state,
-            "agent": owner or "",
-            "last_event": p.get("type", ""),
-            "next_action": p.get("next_action") or "",
-            "artifacts": safe_artifacts(p.get("artifacts", [])),
-        })
+        rows.append(project_row(issue, state, owner, last))
     rows.sort(key=lambda r: int(r["task"][1:]))
     output = {"schema": "ai-bb-pages:v1", "generated": True, "tasks": rows}
     Path("pages").mkdir(exist_ok=True)
