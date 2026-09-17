@@ -59,4 +59,23 @@ comments = [
 state, owner, _ = m.replay(issue, comments, T0 + timedelta(seconds=3))
 assert (state, owner) == ("completed", None)
 
-print("pages projection replay regressions: ok")
+# Projection boundary is an explicit whitelist and never copies Issue/comment payloads.
+secret = event("CLAIM", "agent-safe", "privacy-1", "Authorization: Bearer super-secret-token-value")
+secret["artifacts"] = ["PR:#53@97e0d877", "https://evil.example/raw", "token=secret"]
+c = comment(9, 0, secret)
+state, owner, last = m.replay(issue, [c], T0 + timedelta(seconds=1))
+row = m.project_row({"number": 1, "body": "RAW PRIVATE ISSUE BODY"}, state, owner, last)
+assert tuple(row.keys()) == m.SAFE_FIELDS
+assert row["next_action"] == "[redacted]"
+assert row["artifacts"] == ["PR:#53@97e0d877"]
+serialized = __import__("json").dumps(row)
+assert "RAW PRIVATE ISSUE BODY" not in serialized
+assert "super-secret-token-value" not in serialized
+assert "evil.example" not in serialized
+assert "token=secret" not in serialized
+
+# Benign display strings are bounded and normalized.
+assert m.safe_text("  review   PR #53  ") == "review PR #53"
+assert len(m.safe_text("x" * 500)) == 280
+
+print("pages projection replay/privacy regressions: ok")
