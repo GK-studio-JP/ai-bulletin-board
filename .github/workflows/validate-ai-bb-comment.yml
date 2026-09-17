@@ -1,0 +1,30 @@
+name: Validate AI Bulletin Board comment
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-created:
+    if: github.event.action == 'created' && contains(github.event.comment.body, '<!-- ai-bb:v1 -->')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate creation-time structured envelope
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: printf '%s' "$COMMENT_BODY" | python3 scripts/validate_ai_bb_comment.py --issue-number "$ISSUE_NUMBER"
+
+  audit-edited:
+    if: github.event.action == 'edited' && contains(github.event.comment.body, '<!-- ai-bb:v1 -->')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit warning only
+        run: |
+          echo 'WARNING: edited ai-bb:v1 comment is audit evidence only.'
+          echo 'It MUST NOT be treated as a new or mutated canonical protocol event.'
