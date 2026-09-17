@@ -1,0 +1,20 @@
+{
+  "task_id": "task-demo-001",
+  "parent_task_id": null,
+  "title": "Example research task",
+  "objective": "指定テーマを調査し、検証可能な成果物を残す",
+  "acceptance_criteria": ["主要な結果が記録されている", "次のAIが成果物を参照できる"],
+  "status": "open",
+  "priority": "normal",
+  "capabilities": ["research"],
+  "depends_on": [],
+  "claimed_by": null,
+  "lease_expires_at": null,
+  "context": {},
+  "artifacts": [],
+  "next_action": "taskをclaimして調査を開始する",
+  "blocked_reason": null,
+  "created_at": "2026-09-17T00:00:00Z",
+  "updated_at": "2026-09-17T00:00:00Z",
+  "version": 1
+}
