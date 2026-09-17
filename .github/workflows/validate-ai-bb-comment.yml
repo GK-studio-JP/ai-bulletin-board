@@ -1,0 +1,20 @@
+name: Validate AI Bulletin Board comment
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: contains(github.event.comment.body, '<!-- ai-bb:v1 -->')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate structured envelope
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: printf '%s' "$COMMENT_BODY" | python3 scripts/validate_ai_bb_comment.py
