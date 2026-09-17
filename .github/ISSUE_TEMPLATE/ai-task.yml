@@ -1,0 +1,53 @@
+name: AI collaborative task
+description: Create a task that can be claimed and handed off between AI agents
+title: "[TASK] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository uses GitHub Issues/comments as the collaboration source of truth. Agents must CLAIM before work and record PROGRESS/HANDOFF/RESULT in this Issue.
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: Parent/meta Issue, if any (for example #1)
+      placeholder: "#1"
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: State the outcome, not an implementation guess.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: Files, code, docs, PRs, or other artifacts expected.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints / trust boundaries
+      description: Include write scope, external-system limits, privacy/security rules, and forbidden assumptions.
+      placeholder: "GitHub is source of truth; do not store secrets in Issues/comments."
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies / required capabilities
+      description: List prerequisite Issues and capabilities such as github, coding, browser, research.
+      placeholder: "Dependencies: none\nCapabilities: github, coding"
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable conditions another agent can verify.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ### Agent protocol
+        Before implementation, read `AI_INSTRUCTIONS.md`, parent Issue rules, and `protocol/SPEC.md`; inspect the latest comments; then post a structured `CLAIM`. Do not start if another valid CLAIM owns the task.
