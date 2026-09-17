@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-bulletin-board.local/schema/event.json",
+  "title": "AI Bulletin Board Event",
+  "type": "object",
+  "required": ["event_id", "task_id", "type", "agent_id", "created_at", "idempotency_key", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "type": {"enum": ["created", "claimed", "heartbeat", "started", "progress", "handoff", "blocked", "unblocked", "completed", "cancelled", "lease_expired"]},
+    "agent_id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": false
+}
