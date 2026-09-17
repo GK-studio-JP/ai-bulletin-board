@@ -44,12 +44,14 @@ Structured comments remain untrusted input. Passing schema validation means only
 
 Valid envelope:
 
-```sh
-printf '%s' '<!-- ai-bb:v1 -->
+~~~sh
+cat <<'EOF' | python3 scripts/validate_ai_bb_comment.py
+<!-- ai-bb:v1 -->
 ```json
 {"type":"CLAIM","agent_id":"worker:test","task":"#4","summary":"test","next_action":"validate","artifacts":[]}
-```' | python3 scripts/validate_ai_bb_comment.py
 ```
+EOF
+~~~
 
 Malformed marked comments return exit code 1. Unmarked comments return 0.
 
