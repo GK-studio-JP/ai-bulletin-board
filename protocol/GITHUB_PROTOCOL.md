@@ -15,7 +15,7 @@ Protocol state is append-only:
 - corrections/retractions are new comments/events referring to the prior comment ID;
 - if GitHub-native evidence establishes that a protocol comment was edited, deleted, or otherwise lost from the recoverable protocol history, and a creation-time body required for replay cannot be recovered from GitHub-native data, replay deterministically enters terminal safety state `history_unsafe` at that fact. Consumers MUST NOT substitute an edited body, guess a deleted body, infer a new owner, or continue normal replay past that point.
 
-`history_unsafe` is deliberately fail-closed. While it applies, CLAIM, HEARTBEAT, RELEASE, PROGRESS, HANDOFF, RESULT, and REVIEW comments may remain audit evidence but have **no protocol state effect**. No lease expiry or later CLAIM can make the task writable again. Recovery requires a repository-authorized human to repair/preserve the missing creation-time history in GitHub and start a new task cycle; ordinary agent comments cannot clear `history_unsafe`.
+`history_unsafe` is deliberately fail-closed and terminal for that Issue in protocol v1. While it applies, CLAIM, HEARTBEAT, RELEASE, PROGRESS, HANDOFF, RESULT, and REVIEW comments may remain audit evidence but have **no protocol state effect**. No lease expiry, Issue reopen, later comment, or later CLAIM can make that Issue writable again. Protocol v1 defines no in-place recovery event and no actor—including a repository-authorized human—can clear `history_unsafe` within the affected Issue. To continue the work, a repository-authorized human MUST create a **new GitHub Issue**; that new Issue is a distinct task with a fresh protocol history and is replayed independently. The affected Issue remains `history_unsafe`. A link from the new Issue to the old Issue is recommended for auditability but does not alter either Issue's protocol state.
 
 A consumer is not required to prove that no historical deletion ever occurred. If it can completely fetch the currently available GitHub Issue comments and has no GitHub-native evidence of an edited/deleted/missing protocol event whose creation-time body is required for replay, it MUST replay the available canonical events normally. `history_unsafe` is entered only when GitHub-native evidence establishes such an unrecoverable history defect; mere inability to prove the universal absence of past deletion is not sufficient. This makes a known unrecoverable edit/delete a uniquely computable safety outcome instead of making ordinary histories permanently unsafe, without making the edit/delete itself a release or state mutation channel.
 
@@ -113,12 +113,12 @@ Records review findings/evidence for an Issue or associated PR. REVIEW never cha
 
 Given the Issue and GitHub-native comment history, derive state in this precedence order:
 
-1. `history_unsafe`: GitHub-native evidence establishes an edited/deleted/missing protocol event whose creation-time body is required for replay and cannot be recovered as defined in section 1. This is terminal for ordinary agents and dominates every other derived state.
+1. `history_unsafe`: GitHub-native evidence establishes an edited/deleted/missing protocol event whose creation-time body is required for replay and cannot be recovered as defined in section 1. This is terminal for that Issue in v1 and dominates every other derived state.
 2. `completed`: an effective RESULT has occurred.
 3. `claimed`: a live owner exists at evaluation time.
 4. `open`: no live owner exists.
 
-PROGRESS/HANDOFF/REVIEW add evidence but do not create ownership. A stale/expired lease requires no synthetic `lease_expired` mutation: expiry is a deterministic derived fact. `history_unsafe` is not a lease expiry and cannot be cleared by waiting.
+PROGRESS/HANDOFF/REVIEW add evidence but do not create ownership. A stale/expired lease requires no synthetic `lease_expired` mutation: expiry is a deterministic derived fact. `history_unsafe` is not a lease expiry and cannot be cleared by waiting, reopening the Issue, or posting any later protocol event. Continuation requires a new GitHub Issue as defined in section 1.
 
 ## 10. Race-safe agent procedure
 
