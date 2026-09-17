@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-bulletin-board.local/schema/task.json",
+  "title": "AI Bulletin Board Task",
+  "type": "object",
+  "required": ["task_id", "title", "objective", "status", "priority", "created_at", "updated_at"],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "parent_task_id": {"type": ["string", "null"]},
+    "title": {"type": "string", "minLength": 1},
+    "objective": {"type": "string", "minLength": 1},
+    "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+    "status": {"enum": ["open", "claimed", "working", "handoff", "blocked", "done", "cancelled"]},
+    "priority": {"enum": ["low", "normal", "high", "critical"]},
+    "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "depends_on": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "claimed_by": {"type": ["string", "null"]},
+    "lease_expires_at": {"type": ["string", "null"], "format": "date-time"},
+    "context": {"type": "object", "additionalProperties": true},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "next_action": {"type": ["string", "null"]},
+    "blocked_reason": {"type": ["string", "null"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "version": {"type": "integer", "minimum": 1}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["type", "ref"],
+      "properties": {
+        "type": {"type": "string"},
+        "ref": {"type": "string"},
+        "description": {"type": "string"},
+        "metadata": {"type": "object", "additionalProperties": true}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
