@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        This repository uses GitHub Issues/comments as the collaboration source of truth. Agents must CLAIM before work and record PROGRESS/HANDOFF/RESULT in this Issue.
+        GitHub Issue body + GitHub-created Issue comments are the collaboration source of truth. `protocol/GITHUB_PROTOCOL.md` is canonical. Agents must CLAIM and post-CLAIM replay before implementation, then append canonical work events with fresh idempotency keys.
   - type: input
     id: parent
     attributes:
@@ -50,4 +50,4 @@ body:
     attributes:
       value: |
         ### Agent protocol
-        Before implementation, read `AI_INSTRUCTIONS.md`, parent Issue rules, and `protocol/SPEC.md`; inspect the latest comments; then post a structured `CLAIM`. Do not start if another valid CLAIM owns the task.
+        Before implementation, read current `AI_INSTRUCTIONS.md`, parent/Manager directives, and `protocol/GITHUB_PROTOCOL.md`; fetch the complete Issue comment history; replay canonical state; post a fresh-key structured `CLAIM` only when open; then fetch/replay again. Begin implementation only if your CLAIM is the live winner. HANDOFF does not release ownership; append RELEASE when relinquishing immediately.
