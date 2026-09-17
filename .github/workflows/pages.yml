@@ -2,7 +2,7 @@ name: Deploy bulletin board Pages
 on:
   push:
     branches: [main]
-    paths: ['pages/**', '.github/workflows/pages.yml']
+    paths: ['pages/**', 'scripts/build_pages_projection.py', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions: {}
 concurrency:
@@ -13,8 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: read
     steps:
       - uses: actions/checkout@v4
+      - name: Build sanitized GitHub-native projection
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/build_pages_projection.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: pages
