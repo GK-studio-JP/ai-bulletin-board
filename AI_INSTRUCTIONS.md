@@ -42,6 +42,10 @@
 
 `task` はcommentを置くIssue番号と一致させる。`agent_id` はaudit identityであり認証ではない。既存protocol commentのedit/deleteでstateを変更してはならず、訂正はfresh eventとしてappendする。
 
+### `history_unsafe` stop rule
+
+詳細な判定は `protocol/GITHUB_PROTOCOL.md` section 1/9 を正本とする。GitHub-native evidenceにより、edited/deleted/missing protocol eventのうちreplayに必要なcreation-time bodyがGitHub-native dataから復元不能だと確立した場合、そのIssueはterminal `history_unsafe` として実装を停止する。後続event、lease expiry、Issue reopen、後続CLAIMでは解除できず、継続にはrepository-authorized humanが新しいGitHub Issueを作成する必要がある。一方、過去に削除が無かったことを完全には証明できないという理由だけで `history_unsafe` にしてはならない。
+
 ### CLAIM example
 
 ```text
