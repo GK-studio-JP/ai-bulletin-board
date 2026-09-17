@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths: ['pages/**', 'scripts/build_pages_projection.py', 'scripts/test_build_pages_projection.py', '.github/workflows/pages.yml']
   workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
 permissions: {}
 concurrency:
   group: pages
