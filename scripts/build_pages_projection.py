@@ -82,18 +82,21 @@ def parse_time(value):
 def replay(issue, comments, now):
     number = issue["number"]
     events = []
+    # Check edit evidence for every marker-bearing comment before parsing.
+    # An edit can make a formerly canonical event malformed/noncanonical; because
+    # this API view cannot recover its creation-time body, canonical v1 fails closed.
     for c in comments:
-        p = payload(c.get("body") or "")
-        if p is not None and canonical(p, number):
-            events.append((parse_time(c["created_at"]), int(c["id"]), p, c))
-    events.sort(key=lambda x: (x[0], x[1]))
-
-    # GitHub exposes edit evidence via updated_at. Because the creation-time body
-    # is not recoverable here, fail closed exactly when such evidence exists.
-    for created, _, _, c in events:
+        body = c.get("body") or ""
+        if MARKER not in body:
+            continue
+        created = parse_time(c["created_at"])
         updated = c.get("updated_at")
         if updated and parse_time(updated) != created:
-            return "history_unsafe", None, events[-1] if events else None
+            return "history_unsafe", None, None
+        p = payload(body)
+        if p is not None and canonical(p, number):
+            events.append((created, int(c["id"]), p, c))
+    events.sort(key=lambda x: (x[0], x[1]))
 
     seen = {}
     owner = None
@@ -110,7 +113,12 @@ def replay(issue, comments, now):
         seen[key] = normalized
         last = (created, cid, p, c)
         typ = p["type"]
-        live = owner is not None and expiry is not None and created < expiry
+        # Lease expiry is a derived event-boundary fact. Clear stale ownership
+        # before evaluating any later ownership-sensitive event.
+        if owner is not None and expiry is not None and created >= expiry:
+            owner = None
+            expiry = None
+        live = owner is not None and expiry is not None
         if typ == "CLAIM":
             if not live and not completed:
                 owner = p["agent_id"]
