@@ -85,6 +85,20 @@ def main_check_state(check_runs):
     return "MAIN_UNKNOWN"
 
 
+def current_main_state(head_sha, check_runs, run_sha=None, validation_outcome=None):
+    """Resolve main from the current watchdog run when it validates exact main.
+
+    A PR run must never self-promote its branch/merge SHA to MAIN_GREEN. Outside
+    a current-main watchdog run, only watchdog-named check evidence is used.
+    """
+    if run_sha == head_sha:
+        if validation_outcome == "success":
+            return "MAIN_GREEN"
+        if validation_outcome == "failure":
+            return "MAIN_RED"
+    return main_check_state(check_runs)
+
+
 def head_identity(artifact):
     m = HEAD_RE.fullmatch(artifact or "")
     return (int(m.group(1)), m.group(2)) if m else None
@@ -291,9 +305,18 @@ def collect(repo: str):
             review_meta.append(entry)
     review_meta = [{k: x[k] for k in SAFE_REVIEW_FIELDS} for x in review_meta]
 
-    checks = api(f"{root}/commits/{head_sha}/check-runs").get("check_runs", [])
+    checks = api(
+        f"{root}/commits/{head_sha}/check-runs"
+        "?check_name=watchdog&filter=latest&per_page=100"
+    ).get("check_runs", [])
+    main_status = current_main_state(
+        head_sha,
+        checks,
+        run_sha=os.environ.get("GITHUB_SHA"),
+        validation_outcome=os.environ.get("AI_BB_MAIN_VALIDATION_OUTCOME"),
+    )
     duplicates = {k: v for k, v in workstream_keys(open_issues).items() if len(v) > 1}
-    return derive(tasks, review_meta, main_check_state(checks), duplicates)
+    return derive(tasks, review_meta, main_status, duplicates)
 
 
 def main():
