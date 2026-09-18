@@ -23,7 +23,7 @@ on:
     - cron: '17 * * * *'
 permissions: {}
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.event.pull_request.number) || 'pages-production' }}
   cancel-in-progress: true
 jobs:
   build:
