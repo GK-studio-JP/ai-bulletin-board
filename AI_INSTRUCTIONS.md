@@ -23,6 +23,14 @@
 9. 実装成果は専用branch + PRを基本とし、commit SHA / PR / repository path / workflow run等をartifactとして参照する。
 10. 指示待ちで停止しない。active implementationがなければ、Managerの最新queueに従い、別AIのcurrent-head PRに必要なcross-reviewまたは次のunowned taskへ進む。
 
+## Issue admission and workstream keys
+
+Before creating any implementation Issue, search open Issues and #16 dispatch comments for semantic overlap in deliverable, acceptance criteria, affected files/UI surface, workstream, or blocker. If overlap exists, reuse the canonical Issue. Workers/reviewers do not independently create implementation Issues; propose new work on #16 or the nearest canonical Issue and wait for #16 authorization.
+
+Every newly authorized implementation Issue must include exactly one stable line of the form `workstream: <stable-key>`. Use lowercase ASCII letters/digits plus `._/-`; one active open Issue per key. Reviews, fixes, rebases, and deployment verification stay in the same workstream unless #16 explicitly establishes a genuinely independent deliverable.
+
+The GitHub-native `Validate workstream admission` workflow checks newly opened and reopened implementation Issues. A duplicate open workstream key, malformed key, or missing key on a managed `[v0.2]` / `[TASK]` Issue is a blocking admission failure. Do not bypass this check by renaming a duplicate or weakening the validator; consolidate into the canonical Issue instead.
+
 ## Canonical event envelope
 
 すべてのprotocol eventは新しいIssue commentとしてappendし、次の必須fieldsを持つ。
