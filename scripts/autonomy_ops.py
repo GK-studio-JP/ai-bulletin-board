@@ -85,6 +85,18 @@ def main_check_state(check_runs):
     return "MAIN_UNKNOWN"
 
 
+def head_identity(artifact):
+    m = HEAD_RE.fullmatch(artifact or "")
+    return (int(m.group(1)), m.group(2)) if m else None
+
+
+def same_head(artifact, target):
+    """Match the same PR head while allowing canonical short SHA artifacts."""
+    left = head_identity(artifact)
+    right = head_identity(target)
+    return bool(left and right and left[0] == right[0] and (left[1].startswith(right[1]) or right[1].startswith(left[1])))
+
+
 def review_evidence(comments, current_head, issue_number):
     """Count only canonical independent review evidence under replay semantics."""
     events = []
@@ -128,7 +140,7 @@ def review_evidence(comments, current_head, issue_number):
                 author = head_authors.get(head)
                 if not author or p["agent_id"] == author:
                     continue
-                if head == current_head:
+                if same_head(head, current_head):
                     current_reviewers.add(p["agent_id"])
                 else:
                     stale_reviewers.add(p["agent_id"])
@@ -235,19 +247,16 @@ def collect(repo: str):
         if not m:
             continue
         pr_number = int(m.group(1))
-        exact_head = api(f"{root}/pulls/{pr_number}").get("head", {}).get("sha", "")
-        referenced_sha = m.group(2)
-        if exact_head and not exact_head.startswith(referenced_sha):
-            # The task references a stale head; retain it as stale evidence only.
-            review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head, int(row["task"][1:]))
-            stale_count += review_count
-            review_count = 0
-        else:
-            review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head, int(row["task"][1:]))
+        issue_number = int(row["task"][1:])
+        exact_head_sha = api(f"{root}/pulls/{pr_number}").get("head", {}).get("sha", "")
+        exact_head = f"PR:#{pr_number}@{exact_head_sha}" if exact_head_sha else head
+        review_count, stale_count = review_evidence(
+            comments_by_issue[issue_number], exact_head, issue_number
+        )
         review_meta.append({
             "pr": pr_number,
-            "head": head,
-            "review_needed": bool(row.get("review_needed", False)),
+            "head": exact_head,
+            "review_needed": review_count == 0,
             "review_count": review_count,
             "stale_review_count": stale_count,
         })
