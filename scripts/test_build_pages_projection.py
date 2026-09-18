@@ -64,15 +64,30 @@ secret = event("CLAIM", "agent-safe", "privacy-1", "Authorization: Bearer super-
 secret["artifacts"] = ["PR:#53@97e0d877", "https://evil.example/raw", "token=secret"]
 c = comment(9, 0, secret)
 state, owner, last = m.replay(issue, [c], T0 + timedelta(seconds=1))
-row = m.project_row({"number": 1, "body": "RAW PRIVATE ISSUE BODY"}, state, owner, last)
+row = m.project_row({"number": 1, "title": "Authorization: Bearer title-secret", "body": "RAW PRIVATE ISSUE BODY"}, state, owner, last)
 assert tuple(row.keys()) == m.SAFE_FIELDS
+assert row["title"] == "[redacted]"
 assert row["next_action"] == "[redacted]"
 assert row["artifacts"] == ["PR:#53@97e0d877"]
+assert row["last_activity_at"] == iso(T0)
+assert row["lease_expires_at"] == iso(T0 + timedelta(seconds=900))
+assert row["review_needed"] is True
+assert row["current_head"] == "PR:#53@97e0d877"
 serialized = __import__("json").dumps(row)
 assert "RAW PRIVATE ISSUE BODY" not in serialized
 assert "super-secret-token-value" not in serialized
+assert "title-secret" not in serialized
 assert "evil.example" not in serialized
 assert "token=secret" not in serialized
+
+# Exact-head REVIEW coverage clears review_needed without exposing review bodies.
+reviewed = event("REVIEW", "reviewer", "privacy-2", "checked")
+reviewed["artifacts"] = ["PR:#53@97e0d877"]
+state, owner, last = m.replay(issue, [c, comment(10, 1, reviewed)], T0 + timedelta(seconds=2))
+row = m.project_row({"number": 1, "title": "Safe title"}, state, owner, last)
+assert row["review_needed"] is False
+assert row["current_head"] == "PR:#53@97e0d877"
+assert row["last_activity_at"] == iso(T0 + timedelta(seconds=1))
 
 # Benign display strings are bounded and normalized.
 assert m.safe_text("  review   PR #53  ") == "review PR #53"
