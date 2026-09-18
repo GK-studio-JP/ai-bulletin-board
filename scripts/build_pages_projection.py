@@ -19,7 +19,7 @@ EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT",
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
-SAFE_FIELDS = ("task", "state", "agent", "last_event", "next_action", "artifacts")
+SAFE_FIELDS = ("task", "title", "state", "agent", "last_event", "last_activity_at", "lease_expires_at", "review_needed", "current_head", "next_action", "artifacts")
 CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[_-]?key\s*=|password\s*=|cookie\s*:|private[_ -]?key)")
 
 
@@ -113,6 +113,8 @@ def replay(issue, comments, now):
     expiry = None
     completed = False
     last = None
+    current_head = ""
+    reviewed_heads = set()
     for created, cid, p, c in events:
         key = p["idempotency_key"]
         normalized = json.dumps(p, sort_keys=True, separators=(",", ":"))
@@ -123,6 +125,11 @@ def replay(issue, comments, now):
         seen[key] = normalized
         last = (created, cid, p, c)
         typ = p["type"]
+        heads = [x for x in p.get("artifacts", []) if re.fullmatch(r"PR:#?\\d+@[0-9a-f]{7,40}", x)]
+        if heads:
+            current_head = heads[-1]
+            if typ == "REVIEW":
+                reviewed_heads.update(heads)
         # Lease expiry is a derived event-boundary fact. Clear stale ownership
         # before evaluating any later ownership-sensitive event.
         if owner is not None and expiry is not None and created >= expiry:
@@ -150,6 +157,14 @@ def replay(issue, comments, now):
     else:
         state = "open"
         owner = None
+    if last is not None:
+        meta = {
+            "last_activity_at": last[0].astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "lease_expires_at": expiry.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if owner is not None and expiry is not None and now < expiry else "",
+            "review_needed": bool(current_head and current_head not in reviewed_heads),
+            "current_head": current_head,
+        }
+        last = (*last, meta)
     return state, owner, last
 
 
@@ -159,11 +174,17 @@ def safe_artifacts(items):
 def project_row(issue, state, owner, last):
     """Explicit whitelist boundary between GitHub payloads and Pages JSON."""
     p = last[2] if last else {}
+    meta = last[4] if last and len(last) > 4 else {}
     row = {
         "task": f"#{issue['number']}",
+        "title": safe_text(issue.get("title") or "", 180),
         "state": state,
         "agent": safe_text(owner or "", 160),
         "last_event": p.get("type", "") if p.get("type") in EVENT_TYPES else "",
+        "last_activity_at": meta.get("last_activity_at", ""),
+        "lease_expires_at": meta.get("lease_expires_at", ""),
+        "review_needed": bool(meta.get("review_needed", False)),
+        "current_head": meta.get("current_head", "") if SAFE_ARTIFACT.fullmatch(meta.get("current_head", "")) else "",
         "next_action": safe_text(p.get("next_action") or ""),
         "artifacts": safe_artifacts(p.get("artifacts", [])),
     }
