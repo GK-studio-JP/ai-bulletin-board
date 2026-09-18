@@ -1,5 +1,13 @@
 name: Deploy bulletin board Pages
 on:
+  pull_request:
+    paths:
+      - 'scripts/build_pages_projection.py'
+      - 'scripts/test_build_pages_projection.py'
+      - 'scripts/autonomy_ops.py'
+      - 'scripts/validate_product_ux_contract.py'
+      - 'data/product-ux-e2e/**'
+      - '.github/workflows/pages.yml'
   push:
     branches: [main]
     paths:
@@ -42,6 +50,7 @@ jobs:
         with:
           path: pages
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
