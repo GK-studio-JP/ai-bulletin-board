@@ -3,6 +3,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = "ai-bb-product-ux-e2e:v1"
@@ -86,6 +87,18 @@ def _id(value, name):
     _nonempty_str(value, name)
     _require(ID_RE.fullmatch(value) is not None, f"{name} must be a stable lowercase identifier")
 
+def _timestamp(value, name):
+    _nonempty_str(value, name)
+    text = value.strip()
+    _require("T" in text, f"{name} must be an ISO-8601 date-time")
+    try:
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError as exc:
+        raise ContractError(f"{name} must be a valid ISO-8601 date-time") from exc
+    _require(parsed.tzinfo is not None and parsed.utcoffset() is not None,
+             f"{name} must include timezone")
+    return parsed.astimezone(timezone.utc)
+
 def _list(value, name, *, nonempty=False):
     _require(isinstance(value, list), f"{name} must be a list")
     if nonempty:
@@ -165,7 +178,7 @@ def validate_record(record):
     elif kind == "e2e_result":
         _id(record.get("journey_id"), "journey_id")
         _nonempty_str(record.get("executor_schema"), "executor_schema")
-        _nonempty_str(record.get("measured_at"), "measured_at")
+        _timestamp(record.get("measured_at"), "measured_at")
         vp = record.get("viewport")
         _require(isinstance(vp, dict) and set(vp) == {"class","width","height"},
                  "viewport fields must be class,width,height")
@@ -245,6 +258,9 @@ def validate_records(records):
                  "baseline_ref must resolve to the same executor_schema")
         _require(baseline["viewport"] == result["viewport"],
                  "baseline_ref must resolve to the same viewport")
+        _require(_timestamp(baseline["measured_at"], "baseline measured_at")
+                 < _timestamp(result["measured_at"], "result measured_at"),
+                 "baseline_ref must resolve to a strictly prior measured result")
         if result["budgets"] is not None:
             _require(result["budgets"]["baseline_ref"] == baseline["artifact_ref"],
                      "budgets must resolve to the measured baseline result")
