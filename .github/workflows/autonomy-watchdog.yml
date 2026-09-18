@@ -11,6 +11,9 @@ on:
       - '.github/workflows/autonomy-watchdog.yml'
       - 'WORKER_BOOTSTRAP.md'
       - 'AI_INSTRUCTIONS.md'
+      - 'docs/PRODUCT_UX_E2E_CONTRACT.md'
+      - 'scripts/validate_product_ux_contract.py'
+      - 'scripts/test_validate_product_ux_contract.py'
 
 permissions:
   contents: read
@@ -26,6 +29,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run deterministic autonomy regressions
         run: python3 scripts/test_autonomy_ops.py
+      - name: Run Product/UX/E2E contract regressions
+        run: python3 scripts/test_validate_product_ux_contract.py
       - name: Derive GitHub-native autonomy snapshot
         env:
           GITHUB_TOKEN: ${{ github.token }}
