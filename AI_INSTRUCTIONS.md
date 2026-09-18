@@ -166,6 +166,24 @@ HANDOFFはresumable evidenceでありownershipを移さない。即時離脱す�
 
 Manager #16の最新directiveがroutine assignment/review/merge flowを管理する。通常作業でSupervisor/chat sessionを待たない。canonical protocol ambiguity、secret/security exposure、destructive repository/account change等のみ適切にescalateする。
 
+## Standing Product / UX Labs
+
+Human Owner directive on #16 establishes two standing logical functions inside the bulletin-board operating model. These are governance/discovery queues, not permission to fan out implementation work.
+
+### Product / Feature Lab
+
+Continuously inspect current product behavior, backlog, recurring blockers, user-visible gaps, and safe opportunities for new functionality. Produce evidence-backed proposals that state the problem, expected user value, affected surfaces, dependencies, security/privacy constraints, acceptance tests, and implementation size/risk. Proposal lifecycle is `DISCOVERY -> PROPOSED -> ADMITTED / REJECTED / DEFERRED -> IMPLEMENTING -> VERIFIED`.
+
+A proposal is advisory until #16 admits it through the existing anti-dup/workstream gate. Proposal authors do not create uncontrolled implementation Issues and do not self-approve implementation derived from their proposal.
+
+### UX / UI Optimization Lab
+
+Inspect the real deployed Pages UI with browser-agent and rendered E2E evidence, not source-only inspection. Track concrete layout, navigation, readability, responsive, accessibility, and interaction friction. Meaningful UI changes follow deploy -> rendered E2E -> baseline/budget comparison -> visual acceptance before they are considered verified.
+
+Canonical #59 / `v0.3/autonomy-ops` owns Product/Feature Lab governance, UX findings/proposals, proposal lifecycle, sanitized Pages projection/UI, GitHub-side baseline/budget files, and resume-loop persistence. Canonical #62 / `v0.3/browser-e2e-executor` is the sole admitted independent executor lane for reusable browser-agent rendered-journey measurement across the repository boundary. Browser-agent/Supabase remain executor-private transport only and never become bulletin-board state.
+
+On every resume cycle, after higher-priority security/main-red/live-claim/review work, inspect these standing queues through current GitHub-native state: evidence-backed proposals/findings, admitted implementation, latest E2E/baseline status, regression/budget signals, visual-acceptance status, and executable blocker/owner/next_action. Do not invent work merely to keep a lab busy; evidence and #16 admission remain required.
+
 ## Browser work
 
 `kj2whvbzjn-hue/browser-agent` をexecutorとして使う場合は、そのrepositoryのcurrent `BROWSER_AGENT_INSTRUCTIONS.md` を読む。browser-agent内部relayはexecutor-private implementation detailでありBulletin Board stateではない。generation-bound element IDをhandoffで再利用せず、resume時は再観測する。login/CAPTCHA/本人確認等は必要に応じ人間へtakeoverする。
