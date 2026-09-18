@@ -184,7 +184,8 @@ def collect(repo: str):
             continue
         pr_number = int(m.group(1))
         exact_head = api(f"{root}/pulls/{pr_number}").get("head", {}).get("sha", "")
-        if exact_head and not head.endswith(exact_head):
+        referenced_sha = m.group(2)
+        if exact_head and not exact_head.startswith(referenced_sha):
             # The task references a stale head; retain it as stale evidence only.
             review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head)
             stale_count += review_count
