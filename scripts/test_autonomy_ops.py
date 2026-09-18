@@ -110,6 +110,29 @@ comments = base_comments + [
 ]
 assert m.review_evidence(comments, HEAD2, 59) == (0, 1)
 
+# Producer/reviewer attribution is stable across equivalent short/full SHA artifacts.
+FULL1 = "abcdef1111111111111111111111111111111111"
+full_h1 = f"PR:#61@{FULL1}"
+short_h1 = "PR:#61@abcdef1"
+comments = [
+    comment(1, "2026-09-18T00:00:00Z", proto_event("CLAIM", "author", "#59", "claim-full-short", [])),
+    comment(2, "2026-09-18T00:00:01Z", proto_event("PROGRESS", "author", "#59", "produce-full", [full_h1])),
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "reviewer", "#59", "review-short", [short_h1])),
+]
+assert m.review_evidence(comments, full_h1, 59) == (1, 0)
+comments = [
+    comment(1, "2026-09-18T00:00:00Z", proto_event("CLAIM", "author", "#59", "claim-short-full", [])),
+    comment(2, "2026-09-18T00:00:01Z", proto_event("PROGRESS", "author", "#59", "produce-short", [short_h1])),
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "reviewer", "#59", "review-full", [full_h1])),
+]
+assert m.review_evidence(comments, full_h1, 59) == (1, 0)
+comments = [
+    comment(1, "2026-09-18T00:00:00Z", proto_event("CLAIM", "author", "#59", "claim-self-prefix", [])),
+    comment(2, "2026-09-18T00:00:01Z", proto_event("PROGRESS", "author", "#59", "produce-self-full", [full_h1])),
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "author", "#59", "self-short", [short_h1])),
+]
+assert m.review_evidence(comments, full_h1, 59) == (0, 0)
+
 # Review Queue is keyed to the actual current PR SHA, never a reviewed stale canonical head.
 H1_FULL = "abcdef1111111111111111111111111111111111"
 H2_FULL = "abcdef2222222222222222222222222222222222"
