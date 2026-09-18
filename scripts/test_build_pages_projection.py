@@ -120,6 +120,18 @@ row = m.project_row({"number": 1, "title": "Review task"}, state, owner, last)
 assert row["current_head"] == head2
 assert row["review_needed"] is True
 
+# A later non-review mention of an already-seen older head must not regress current_head.
+stale_nonreview = event("PROGRESS", "manager", "head-stale-nonreview")
+stale_nonreview["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(41, 0, produced1), comment(42, 1, produced2), comment(43, 2, stale_nonreview)],
+    T0 + timedelta(seconds=3),
+)
+row = m.project_row({"number": 1, "title": "Non-regressive head task"}, state, owner, last)
+assert row["current_head"] == head2
+assert row["review_needed"] is True
+
 self_review = event("REVIEW", "author", "head-self-review")
 self_review["artifacts"] = [head1]
 state, owner, last = m.replay(
