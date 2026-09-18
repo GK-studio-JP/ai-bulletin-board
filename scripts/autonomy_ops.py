@@ -166,6 +166,25 @@ def review_evidence(comments, current_head, issue_number):
     return len(current_reviewers), len(stale_reviewers)
 
 
+def review_queue_entry(row, comments, exact_head_sha):
+    """Project review state against the actual current PR head, never a stale task ref."""
+    head = row.get("current_head") or ""
+    m = HEAD_RE.fullmatch(head)
+    if not m:
+        return None
+    pr_number = int(m.group(1))
+    issue_number = int(row["task"][1:])
+    exact_head = f"PR:#{pr_number}@{exact_head_sha}" if exact_head_sha else head
+    review_count, stale_count = review_evidence(comments, exact_head, issue_number)
+    return {
+        "pr": pr_number,
+        "head": exact_head,
+        "review_needed": review_count == 0,
+        "review_count": review_count,
+        "stale_review_count": stale_count,
+    }
+
+
 def classify_task(row, main_status):
     state = row.get("state") or "open"
     next_action = row.get("next_action") or ""
@@ -249,17 +268,9 @@ def collect(repo: str):
         pr_number = int(m.group(1))
         issue_number = int(row["task"][1:])
         exact_head_sha = api(f"{root}/pulls/{pr_number}").get("head", {}).get("sha", "")
-        exact_head = f"PR:#{pr_number}@{exact_head_sha}" if exact_head_sha else head
-        review_count, stale_count = review_evidence(
-            comments_by_issue[issue_number], exact_head, issue_number
-        )
-        review_meta.append({
-            "pr": pr_number,
-            "head": exact_head,
-            "review_needed": review_count == 0,
-            "review_count": review_count,
-            "stale_review_count": stale_count,
-        })
+        entry = review_queue_entry(row, comments_by_issue[issue_number], exact_head_sha)
+        if entry:
+            review_meta.append(entry)
     review_meta = [{k: x[k] for k in SAFE_REVIEW_FIELDS} for x in review_meta]
 
     checks = api(f"{root}/commits/{head_sha}/check-runs").get("check_runs", [])
