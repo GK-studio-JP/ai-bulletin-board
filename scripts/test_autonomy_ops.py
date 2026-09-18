@@ -126,6 +126,11 @@ assert entry["head"] == f"PR:#61@{H2_FULL}"
 assert entry["review_needed"] is True
 assert entry["review_count"] == 0
 assert entry["stale_review_count"] == 1
+m.reconcile_task_review(stale_row, entry)
+queue_out = m.derive([stale_row], [entry], "MAIN_GREEN", {})
+assert queue_out["queue"][0]["current_head"] == f"PR:#61@{H2_FULL}"
+assert queue_out["queue"][0]["review_needed"] is True
+assert queue_out["queue"][0]["next_class"] == "review-needed"
 
 # Once the actual current head has canonical producer + independent review evidence, coverage clears.
 comments += [
@@ -137,5 +142,11 @@ assert entry["head"] == f"PR:#61@{H2_FULL}"
 assert entry["review_needed"] is False
 assert entry["review_count"] == 1
 assert entry["stale_review_count"] == 1
+covered_row = row(task="#59", review=True, head=h1_short)
+m.reconcile_task_review(covered_row, entry)
+queue_out = m.derive([covered_row], [entry], "MAIN_GREEN", {})
+assert queue_out["queue"][0]["current_head"] == f"PR:#61@{H2_FULL}"
+assert queue_out["queue"][0]["review_needed"] is False
+assert queue_out["queue"][0]["next_class"] == "integration/verification"
 
 print("autonomy_ops regressions: ok")
