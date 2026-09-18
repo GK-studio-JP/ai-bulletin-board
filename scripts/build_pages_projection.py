@@ -117,6 +117,7 @@ def replay(issue, comments, now):
     current_head = ""
     reviewed_heads = set()
     head_authors = {}
+    seen_heads = set()
     for created, cid, p, c in events:
         key = p["idempotency_key"]
         normalized = json.dumps(p, sort_keys=True, separators=(",", ":"))
@@ -135,8 +136,12 @@ def replay(issue, comments, now):
                     if author and p["agent_id"] != author:
                         reviewed_heads.add(head)
             else:
-                current_head = heads[-1]
-                head_authors.setdefault(current_head, p["agent_id"])
+                for head in heads:
+                    if head in seen_heads:
+                        continue
+                    seen_heads.add(head)
+                    current_head = head
+                    head_authors.setdefault(head, p["agent_id"])
         # Lease expiry is a derived event-boundary fact. Clear stale ownership
         # before evaluating any later ownership-sensitive event.
         if owner is not None and expiry is not None and created >= expiry:
