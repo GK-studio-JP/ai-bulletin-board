@@ -3,13 +3,21 @@ name: Validate workstream admission
 on:
   issues:
     types: [opened, reopened]
+  pull_request:
+    paths:
+      - "scripts/validate_workstream_admission.py"
+      - "scripts/test_validate_workstream_admission.py"
+      - ".github/workflows/validate-workstream-admission.yml"
+      - "AI_INSTRUCTIONS.md"
+      - "WORKER_BOOTSTRAP.md"
 
 permissions:
   contents: read
   issues: read
 
 jobs:
-  workstream-admission:
+  admission:
+    if: github.event_name == 'issues'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -18,5 +26,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/validate_workstream_admission.py --event "$GITHUB_EVENT_PATH"
+      - name: Run deterministic admission regressions
+        run: python3 scripts/test_validate_workstream_admission.py
+
+  regression:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
       - name: Run deterministic admission regressions
         run: python3 scripts/test_validate_workstream_admission.py
