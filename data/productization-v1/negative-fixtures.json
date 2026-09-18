@@ -18,7 +18,7 @@
   },
   {
     "name": "unmapped-state-effect-principal",
-    "contains": "unmapped principals cannot affect state",
+    "contains": "unmapped principal cannot affect state",
     "ops": [
       {
         "op": "set",
