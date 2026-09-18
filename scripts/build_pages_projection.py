@@ -125,7 +125,7 @@ def replay(issue, comments, now):
         seen[key] = normalized
         last = (created, cid, p, c)
         typ = p["type"]
-        heads = [x for x in p.get("artifacts", []) if re.fullmatch(r"PR:#?\\d+@[0-9a-f]{7,40}", x)]
+        heads = [x for x in p.get("artifacts", []) if re.fullmatch(r"PR:#?\d+@[0-9a-f]{7,40}", x)]
         if heads:
             current_head = heads[-1]
             if typ == "REVIEW":
