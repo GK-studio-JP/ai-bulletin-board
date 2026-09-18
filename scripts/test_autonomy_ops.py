@@ -110,4 +110,32 @@ comments = base_comments + [
 ]
 assert m.review_evidence(comments, HEAD2, 59) == (0, 1)
 
+# Review Queue is keyed to the actual current PR SHA, never a reviewed stale canonical head.
+H1_FULL = "abcdef1111111111111111111111111111111111"
+H2_FULL = "abcdef2222222222222222222222222222222222"
+h1_short = "PR:#61@abcdef1"
+h2_short = "PR:#61@abcdef2"
+comments = [
+    comment(1, "2026-09-18T00:00:00Z", proto_event("CLAIM", "author", "#59", "claim-exact", [])),
+    comment(2, "2026-09-18T00:00:01Z", proto_event("PROGRESS", "author", "#59", "produce-old", [h1_short])),
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "reviewer-a", "#59", "review-old", [h1_short])),
+]
+stale_row = row(task="#59", review=False, head=h1_short)
+entry = m.review_queue_entry(stale_row, comments, H2_FULL)
+assert entry["head"] == f"PR:#61@{H2_FULL}"
+assert entry["review_needed"] is True
+assert entry["review_count"] == 0
+assert entry["stale_review_count"] == 1
+
+# Once the actual current head has canonical producer + independent review evidence, coverage clears.
+comments += [
+    comment(4, "2026-09-18T00:00:03Z", proto_event("PROGRESS", "author", "#59", "produce-new", [h2_short])),
+    comment(5, "2026-09-18T00:00:04Z", proto_event("REVIEW", "reviewer-b", "#59", "review-new", [h2_short])),
+]
+entry = m.review_queue_entry(stale_row, comments, H2_FULL)
+assert entry["head"] == f"PR:#61@{H2_FULL}"
+assert entry["review_needed"] is False
+assert entry["review_count"] == 1
+assert entry["stale_review_count"] == 1
+
 print("autonomy_ops regressions: ok")
