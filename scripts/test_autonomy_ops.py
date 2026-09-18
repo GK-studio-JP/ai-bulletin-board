@@ -61,7 +61,7 @@ def proto_event(typ, agent, task, key, artifacts, next_action="work", summary="e
         "summary": summary, "next_action": None if typ == "RESULT" else next_action,
         "artifacts": artifacts,
     }
-    return "<!-- ai-bb:v1 -->\n\`\`\`json\n" + json.dumps(payload) + "\n\`\`\`"
+    return "<!-- ai-bb:v1 -->\n```json\n" + json.dumps(payload) + "\n```"
 
 
 def comment(cid, when, body, updated=None):
@@ -82,7 +82,7 @@ comments = base_comments + [
 assert m.review_evidence(comments, HEAD1, 59) == (0, 0)
 
 # Malformed and task-mismatched REVIEW payloads do not count.
-malformed = "<!-- ai-bb:v1 -->\n\`\`\`json\n{\"type\":\"REVIEW\",\"agent_id\":\"reviewer\",\"task\":\"#59\",\"artifacts\":[\"PR:#61@abcdef1\"]}\n\`\`\`"
+malformed = "<!-- ai-bb:v1 -->\n```json\n{\"type\":\"REVIEW\",\"agent_id\":\"reviewer\",\"task\":\"#59\",\"artifacts\":[\"PR:#61@abcdef1\"]}\n```"
 comments = base_comments + [
     comment(3, "2026-09-18T00:00:02Z", malformed),
     comment(4, "2026-09-18T00:00:03Z", proto_event("REVIEW", "reviewer", "#60", "wrong-task", [HEAD1])),
