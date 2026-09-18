@@ -1,0 +1,198 @@
+{
+  "schema_version": "ai-bb-productization:v1",
+  "project_config": {
+    "profile": "public-pages",
+    "topology": {
+      "platform": "github.com",
+      "repository_mode": "single-repo",
+      "managed_pr_scope": "local",
+      "actions_required": true
+    },
+    "console": {
+      "mode": "public-pages",
+      "data_classification": "public",
+      "public_opt_in": true
+    },
+    "browser": {
+      "enabled": false,
+      "transport": "disabled"
+    },
+    "required_secret_refs": []
+  },
+  "installation_state": {
+    "installation_id": "aibb-reference-0001",
+    "repository": {
+      "owner": "example",
+      "name": "reference-project",
+      "repository_id": 123456789,
+      "default_branch": "main",
+      "integration_branch": "main"
+    },
+    "roles": {
+      "manager": 101,
+      "review_manager": 102,
+      "product_ux": 103
+    },
+    "resources": [
+      {
+        "type": "issue",
+        "id": "101",
+        "managed": true,
+        "owner_marker": "aibb-reference-0001"
+      },
+      {
+        "type": "workflow",
+        "id": "autonomy-watchdog",
+        "managed": true,
+        "owner_marker": "aibb-reference-0001"
+      }
+    ],
+    "versions": {
+      "core": "1.0.0-phase0",
+      "workflow": "1.0.0-phase0",
+      "config_schema": "ai-bb-productization:v1"
+    },
+    "lifecycle_state": "ACTIVE"
+  },
+  "authorization_policy": {
+    "agent_id_is_authentication": false,
+    "principals": [
+      {
+        "principal_id": "app.control-plane",
+        "github_kind": "app",
+        "github_id": 987654,
+        "capabilities": [
+          "claim",
+          "heartbeat",
+          "release",
+          "progress",
+          "handoff",
+          "result",
+          "review"
+        ]
+      },
+      {
+        "principal_id": "team.integrators",
+        "github_kind": "team",
+        "github_id": 2222,
+        "capabilities": [
+          "integrate"
+        ]
+      }
+    ],
+    "state_effect_principals": [
+      "app.control-plane",
+      "team.integrators"
+    ]
+  },
+  "release_manifest": {
+    "release_id": "ai-bb-v1.0.0-rc1",
+    "supported_profile": "public-pages",
+    "components": {
+      "core": {
+        "repository": "example/ai-bulletin-board-core",
+        "commit_sha": "1111111111111111111111111111111111111111",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "workflows": {
+        "repository": "example/ai-bulletin-board-core",
+        "commit_sha": "2222222222222222222222222222222222222222",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    "actions": [
+      {
+        "uses": "actions/checkout@3333333333333333333333333333333333333333"
+      }
+    ],
+    "sbom_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "evidence_manifest": {
+    "release_manifest_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "reference_commits": [
+      "example/reference-project@4444444444444444444444444444444444444444"
+    ],
+    "artifacts": [
+      {
+        "name": "acceptance-results",
+        "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      }
+    ],
+    "actions_retention_independent": true
+  },
+  "compatibility": {
+    "current_version": "1.0.0-rc1",
+    "supported_upgrade_from": [
+      "0.9.0"
+    ],
+    "canonical_history_rewrite": false,
+    "downgrade_policy": "fail-closed-if-persisted-schema-unsupported",
+    "persisted_schema_versions": [
+      "ai-bb-productization:v1",
+      "ai-bb-product-ux-e2e:v1"
+    ],
+    "migrations": [
+      {
+        "from": "0.9.0",
+        "to": "1.0.0-rc1",
+        "persisted_schema_compatible": true
+      }
+    ],
+    "requested_downgrade": null
+  },
+  "operator_contract": {
+    "states": [
+      "healthy_idle",
+      "work_in_progress",
+      "review_needed",
+      "human_required",
+      "recovery_needed",
+      "completed_accepted"
+    ],
+    "human_required_fields": [
+      "reason",
+      "action",
+      "surface",
+      "urgency",
+      "safety_privacy",
+      "evidence_link",
+      "resolver",
+      "defer_cancel",
+      "expiry_staleness",
+      "resume_path"
+    ],
+    "evidence_freshness_fields": [
+      "source_release",
+      "measured_at",
+      "freshness",
+      "scope",
+      "acceptance_status"
+    ],
+    "autonomy_policy": {
+      "human_gated": [
+        "production",
+        "destructive",
+        "account",
+        "permission",
+        "security_sensitive"
+      ],
+      "halt_conditions": [
+        "main_red",
+        "authorization_anomaly",
+        "secret_exposure",
+        "permission_expansion"
+      ]
+    },
+    "accessibility": {
+      "keyboard": true,
+      "screen_reader": true,
+      "color_independent": true,
+      "visible_focus_errors": true,
+      "long_text": true,
+      "narrow_mobile_priority": true
+    },
+    "supported_language": "en"
+  }
+}
