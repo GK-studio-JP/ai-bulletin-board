@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Deterministic regression tests for the Pages canonical replay."""
 from datetime import datetime, timedelta, timezone
+import copy
 import importlib.util
+import json
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location("projection", Path(__file__).with_name("build_pages_projection.py"))
@@ -173,4 +175,186 @@ assert row["review_needed"] is False
 assert m.safe_text("  review   PR #53  ") == "review PR #53"
 assert len(m.safe_text("x" * 500)) == 280
 
-print("pages projection replay/privacy regressions: ok")
+# v0.3 autonomy projection: exact whitelisted fields, Human Required extraction,
+# and conservative exact-head dedupe when legacy task references disagree.
+autonomy = {
+    "schema": "ai-bb-autonomy:v1",
+    "generated": True,
+    "health": {
+        "main_status": "MAIN_GREEN",
+        "duplicate_workstream_violation": False,
+        "review_storm": True,
+        "stale_review": True,
+        "stale_or_expiring_claim": False,
+        "history_unsafe": False,
+        "human_required": True,
+        "raw_private": "must not project",
+    },
+    "queue": [
+        {
+            "task": "#23",
+            "state": "open",
+            "agent": "",
+            "lease_status": "",
+            "review_needed": False,
+            "current_head": "",
+            "next_action": "Human Owner must decide account setting",
+            "next_class": "idle/human-required",
+            "waiting_reason": "human-required decision",
+            "raw_comment": "PRIVATE",
+        },
+        {
+            "task": "#59",
+            "state": "open",
+            "agent": "",
+            "lease_status": "stale",
+            "review_needed": True,
+            "current_head": "PR:#68@d33e02d",
+            "next_action": "Review exact head",
+            "next_class": "review-needed",
+            "waiting_reason": "current exact head lacks independent review",
+        },
+    ],
+    "review_queue": [
+        {"pr": 68, "head": "PR:#68@d33e02d", "review_needed": False, "review_count": 1, "stale_review_count": 0},
+        {"pr": 68, "head": "PR:#68@d33e02d", "review_needed": True, "review_count": 0, "stale_review_count": 2},
+    ],
+    "duplicate_workstreams": {},
+}
+a = m.project_autonomy(autonomy, "kj2whvbzjn-hue/ai-bulletin-board")
+assert tuple(a["health"]) == m.AUTONOMY_HEALTH_FIELDS
+assert "raw_private" not in a["health"]
+assert len(a["review_queue"]) == 1
+assert a["review_queue"][0] == {
+    "repository": "kj2whvbzjn-hue/ai-bulletin-board",
+    "pr": 68,
+    "head": "PR:#68@d33e02d",
+    "review_needed": True,
+    "review_count": 0,
+    "stale_review_count": 2,
+}
+assert a["human_required"] == [{
+    "task": "#23",
+    "next_action": "Human Owner must decide account setting",
+    "waiting_reason": "human-required decision",
+}]
+assert "raw_comment" not in json.dumps(a)
+
+bad_autonomy = copy.deepcopy(autonomy)
+bad_autonomy["review_queue"][0]["head"] = "PR:#67@d33e02d"
+try:
+    m.project_autonomy(bad_autonomy, "kj2whvbzjn-hue/ai-bulletin-board")
+except ValueError as exc:
+    assert "match pr" in str(exc)
+else:
+    raise AssertionError("mismatched review PR/head must fail closed")
+
+# Product/UX/E2E summaries are validated first and only whitelisted fields project.
+metrics = {
+    "transition_success": True,
+    "destination_correct": True,
+    "action_count": 2,
+    "vertical_travel_px": 0,
+    "vertical_travel_vh": 0,
+    "reversal_count": 0,
+    "target_visible_before": False,
+    "target_visible_after": False,
+    "target_distance_before_px": 147,
+    "target_distance_after_px": 0,
+    "horizontal_overflow_px": 0,
+    "overlap_count": 0,
+    "clipping_count": 2,
+    "state_persistence_pass": True,
+    "keyboard_accessibility_pass": True,
+    "empty_error_state_pass": True,
+}
+proposal = {
+    "schema_version": "ai-bb-product-ux-e2e:v1",
+    "kind": "product_proposal",
+    "proposal_id": "product/review-queue",
+    "lifecycle": "PROPOSED",
+    "problem": "Review work is hard to discover.",
+    "evidence_refs": ["Issue:#59"],
+    "expected_user_value": "Make exact-head waiting work visible.",
+    "affected_surfaces": ["pages-board"],
+    "dependencies": [],
+    "security_privacy_constraints": ["sanitized-projection-only"],
+    "acceptance_tests": ["review-queue-visible"],
+    "size_risk": "small presentation follow-up",
+    "owner": "product-lab",
+    "next_action": "Request admission",
+}
+finding = {
+    "schema_version": "ai-bb-product-ux-e2e:v1",
+    "kind": "ux_finding",
+    "finding_id": "ux/narrow-review-target",
+    "lifecycle": "VERIFIED",
+    "evidence_refs": ["artifact:rendered-e2e/review-target"],
+    "surfaces": ["pages-board"],
+    "friction": "Target is below the narrow viewport.",
+    "hypothesis": "Reduce vertical chrome.",
+    "acceptance_tests": ["desktop-narrow-rendered-pass"],
+    "workstream_ref": "v0.3/autonomy-ops",
+    "rendered_e2e_ref": "artifact:rendered-e2e/review-target-after",
+    "owner": "ux-lab",
+    "next_action": None,
+}
+baseline = {
+    "schema_version": "ai-bb-product-ux-e2e:v1",
+    "kind": "e2e_result",
+    "journey_id": "board/review-needed-inspect",
+    "executor_schema": "browser-agent-live-board-baseline:v1",
+    "measured_at": "2026-09-18T01:00:00Z",
+    "viewport": {"class": "narrow", "width": 390, "height": 844},
+    "metrics": metrics,
+    "artifact_ref": "artifact:baseline-review-narrow",
+    "baseline_ref": None,
+    "comparison": "baseline",
+    "budgets": None,
+    "next_action": "Compare future result",
+}
+compared = copy.deepcopy(baseline)
+compared["measured_at"] = "2026-09-18T02:00:00Z"
+compared["artifact_ref"] = "artifact:after-review-narrow"
+compared["baseline_ref"] = baseline["artifact_ref"]
+compared["comparison"] = "improved"
+compared["metrics"] = dict(metrics, target_distance_before_px=20)
+compared["budgets"] = {
+    "baseline_ref": baseline["artifact_ref"],
+    "rationale": "Measured baseline supports this target-distance ceiling.",
+    "thresholds": {"target_distance_before_px": 147},
+}
+p = m.project_product_ux([proposal, finding, baseline, compared])
+assert p["proposals"][0]["proposal_id"] == "product/review-queue"
+assert p["ux_findings"][0]["visual_acceptance_status"] == "verified"
+assert p["ux_findings"][0]["rendered_e2e_ref"] == "artifact:rendered-e2e/review-target-after"
+assert len(p["e2e_latest"]) == 1
+assert p["e2e_latest"][0]["artifact_ref"] == "artifact:after-review-narrow"
+assert p["e2e_latest"][0]["baseline_ref"] == "artifact:baseline-review-narrow"
+assert p["e2e_latest"][0]["comparison"] == "improved"
+assert p["e2e_latest"][0]["budgets"]["thresholds"] == {"target_distance_before_px": 147}
+
+unsafe = copy.deepcopy(proposal)
+unsafe["evidence_refs"] = ["https://evil.example/raw?token=secret"]
+try:
+    m.project_product_ux([unsafe])
+except ValueError:
+    pass
+else:
+    raise AssertionError("URL/query evidence reference must not enter Pages projection")
+
+# Complete v2 document is additive: existing tasks remain and new surfaces are bounded.
+document = m.build_output(
+    [row],
+    autonomy,
+    "kj2whvbzjn-hue/ai-bulletin-board",
+    [proposal, finding, baseline, compared],
+)
+assert document["schema"] == "ai-bb-pages:v2"
+assert set(document) == {"schema", "generated", "tasks", "autonomy", "product_ux"}
+assert document["tasks"] == [row]
+serialized = json.dumps(document)
+for secret_text in ("RAW PRIVATE ISSUE BODY", "raw_private", "raw_comment", "evil.example"):
+    assert secret_text not in serialized
+
+print("pages projection replay/privacy/v0.3 schema regressions: ok")

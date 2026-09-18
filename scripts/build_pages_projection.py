@@ -6,6 +6,7 @@ coordination fields and fails closed when replay cannot be completed safely.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -13,11 +14,32 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from validate_product_ux_contract import validate_records
+
 MARKER = "<!-- ai-bb:v1 -->"
 LEASE_SECONDS = 900
 EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT", "REVIEW"}
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
+
+SAFE_REFERENCE = re.compile(r"^[A-Za-z0-9._:/#@+\-]+$")
+SAFE_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+EXACT_HEAD = re.compile(r"^PR:#?(\d+)@([0-9a-f]{7,40})$")
+AUTONOMY_HEALTH_FIELDS = (
+    "main_status", "duplicate_workstream_violation", "review_storm",
+    "stale_review", "stale_or_expiring_claim", "history_unsafe", "human_required",
+)
+AUTONOMY_QUEUE_FIELDS = (
+    "task", "state", "agent", "lease_status", "review_needed", "current_head",
+    "next_action", "next_class", "waiting_reason",
+)
+NEXT_CLASSES = {
+    "broken-main/security", "live-claim", "review-needed", "implementation-ready",
+    "integration/verification", "idle/human-required",
+}
+MAIN_STATUSES = {"MAIN_GREEN", "MAIN_RED", "MAIN_UNKNOWN"}
+TASK_STATES = {"open", "claimed", "completed", "history_unsafe", "blocked"}
+LEASE_STATES = {"", "active", "expiring", "stale"}
 
 SAFE_FIELDS = ("task", "title", "state", "agent", "last_event", "last_activity_at", "lease_expires_at", "lease_status", "review_needed", "current_head", "next_action", "artifacts")
 CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[_-]?key\s*=|password\s*=|cookie\s*:|private[_ -]?key)")
@@ -26,8 +48,31 @@ CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[
 def safe_text(value, limit=280):
     """Normalize bounded display text and fail closed on credential-like content."""
     text = " ".join(str(value or "").split())
-    if CREDENTIAL_LIKE.search(text): return "[redacted]"
+    if CREDENTIAL_LIKE.search(text):
+        return "[redacted]"
     return text[:limit]
+
+
+def safe_reference(value, limit=240):
+    """Allow only bounded non-URL evidence/reference tokens into public projection."""
+    text = safe_text(value, limit)
+    if (
+        not text
+        or text == "[redacted]"
+        or "://" in text
+        or "?" in text
+        or "&" in text
+        or "=" in text
+        or SAFE_REFERENCE.fullmatch(text) is None
+    ):
+        raise ValueError("unsafe projection reference")
+    return text
+
+
+def safe_text_list(values, *, limit=240):
+    if not isinstance(values, list):
+        raise ValueError("projection list must be a list")
+    return [safe_text(value, limit) for value in values]
 
 
 def api(url: str):
@@ -216,7 +261,269 @@ def project_row(issue, state, owner, last):
     return {key: row[key] for key in SAFE_FIELDS}
 
 
+def _bool(value, name):
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be boolean")
+    return value
+
+
+def _nonnegative_int(value, name):
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{name} must be non-negative integer")
+    return value
+
+
+def project_autonomy(snapshot, repository):
+    """Whitelisted projection of the already-derived read-only autonomy snapshot."""
+    if not isinstance(snapshot, dict) or snapshot.get("schema") != "ai-bb-autonomy:v1":
+        raise ValueError("unsupported autonomy snapshot")
+    if SAFE_REPOSITORY.fullmatch(repository or "") is None:
+        raise ValueError("invalid repository identity")
+
+    raw_health = snapshot.get("health")
+    if not isinstance(raw_health, dict):
+        raise ValueError("autonomy health must be an object")
+    main_status = raw_health.get("main_status")
+    if main_status not in MAIN_STATUSES:
+        raise ValueError("invalid main_status")
+    health = {"main_status": main_status}
+    for key in AUTONOMY_HEALTH_FIELDS[1:]:
+        health[key] = _bool(raw_health.get(key), f"health.{key}")
+
+    queue = []
+    raw_queue = snapshot.get("queue")
+    if not isinstance(raw_queue, list):
+        raise ValueError("autonomy queue must be a list")
+    for raw in raw_queue:
+        if not isinstance(raw, dict):
+            raise ValueError("autonomy queue row must be an object")
+        task = str(raw.get("task") or "")
+        if re.fullmatch(r"#\d+", task) is None:
+            raise ValueError("invalid autonomy task")
+        state = raw.get("state")
+        if state not in TASK_STATES:
+            raise ValueError("invalid autonomy state")
+        lease_status = raw.get("lease_status") or ""
+        if lease_status not in LEASE_STATES:
+            raise ValueError("invalid autonomy lease_status")
+        current_head = raw.get("current_head") or ""
+        if current_head and EXACT_HEAD.fullmatch(current_head) is None:
+            raise ValueError("invalid autonomy current_head")
+        next_class = raw.get("next_class")
+        if next_class not in NEXT_CLASSES:
+            raise ValueError("invalid autonomy next_class")
+        row = {
+            "task": task,
+            "state": state,
+            "agent": safe_text(raw.get("agent") or "", 160),
+            "lease_status": lease_status,
+            "review_needed": _bool(raw.get("review_needed"), "queue.review_needed"),
+            "current_head": current_head,
+            "next_action": safe_text(raw.get("next_action") or ""),
+            "next_class": next_class,
+            "waiting_reason": safe_text(raw.get("waiting_reason") or ""),
+        }
+        queue.append({key: row[key] for key in AUTONOMY_QUEUE_FIELDS})
+
+    deduped = {}
+    raw_reviews = snapshot.get("review_queue")
+    if not isinstance(raw_reviews, list):
+        raise ValueError("autonomy review_queue must be a list")
+    for raw in raw_reviews:
+        if not isinstance(raw, dict):
+            raise ValueError("review queue row must be an object")
+        pr = _nonnegative_int(raw.get("pr"), "review.pr")
+        if pr <= 0:
+            raise ValueError("review.pr must be positive")
+        head = str(raw.get("head") or "")
+        match = EXACT_HEAD.fullmatch(head)
+        if match is None or int(match.group(1)) != pr:
+            raise ValueError("review head must match pr")
+        review_needed = _bool(raw.get("review_needed"), "review.review_needed")
+        review_count = _nonnegative_int(raw.get("review_count"), "review.review_count")
+        stale_count = _nonnegative_int(raw.get("stale_review_count"), "review.stale_review_count")
+        key = (repository, pr, head)
+        current = {
+            "repository": repository,
+            "pr": pr,
+            "head": head,
+            "review_needed": review_needed,
+            "review_count": review_count,
+            "stale_review_count": stale_count,
+        }
+        previous = deduped.get(key)
+        if previous is None:
+            deduped[key] = current
+            continue
+        needs_review = previous["review_needed"] or review_needed
+        previous["review_needed"] = needs_review
+        previous["review_count"] = (
+            min(previous["review_count"], review_count)
+            if needs_review
+            else max(previous["review_count"], review_count)
+        )
+        previous["stale_review_count"] = max(previous["stale_review_count"], stale_count)
+
+    review_queue = [deduped[key] for key in sorted(deduped, key=lambda item: (item[1], item[2]))]
+    human_required = [
+        {
+            "task": row["task"],
+            "next_action": row["next_action"],
+            "waiting_reason": row["waiting_reason"],
+        }
+        for row in queue
+        if row["next_class"] == "idle/human-required"
+        and row["waiting_reason"] == "human-required decision"
+    ]
+    return {
+        "health": health,
+        "queue": queue,
+        "review_queue": review_queue,
+        "human_required": human_required,
+    }
+
+
+def _optional_reference(value):
+    if value in {None, ""}:
+        return None
+    return safe_reference(value)
+
+
+def _optional_text(value, limit=280):
+    if value is None:
+        return None
+    return safe_text(value, limit)
+
+
+def _product_proposal(record):
+    return {
+        "proposal_id": safe_reference(record["proposal_id"]),
+        "lifecycle": record["lifecycle"],
+        "problem": safe_text(record["problem"], 400),
+        "evidence_refs": [safe_reference(x) for x in record["evidence_refs"]],
+        "expected_user_value": safe_text(record["expected_user_value"], 400),
+        "affected_surfaces": safe_text_list(record["affected_surfaces"]),
+        "dependencies": safe_text_list(record["dependencies"]),
+        "security_privacy_constraints": safe_text_list(record["security_privacy_constraints"], limit=320),
+        "acceptance_tests": safe_text_list(record["acceptance_tests"], limit=320),
+        "size_risk": safe_text(record["size_risk"], 320),
+        "owner": safe_text(record["owner"], 160),
+        "next_action": _optional_text(record["next_action"], 320),
+        "workstream_ref": _optional_reference(record.get("workstream_ref")),
+    }
+
+
+def _ux_finding(record):
+    rendered_ref = _optional_reference(record.get("rendered_e2e_ref"))
+    return {
+        "finding_id": safe_reference(record["finding_id"]),
+        "lifecycle": record["lifecycle"],
+        "evidence_refs": [safe_reference(x) for x in record["evidence_refs"]],
+        "surfaces": safe_text_list(record["surfaces"]),
+        "friction": safe_text(record["friction"], 400),
+        "hypothesis": safe_text(record["hypothesis"], 400),
+        "acceptance_tests": safe_text_list(record["acceptance_tests"], limit=320),
+        "workstream_ref": _optional_reference(record.get("workstream_ref")),
+        "rendered_e2e_ref": rendered_ref,
+        "visual_acceptance_status": "verified" if record["lifecycle"] == "VERIFIED" and rendered_ref else "not_recorded",
+        "owner": safe_text(record["owner"], 160),
+        "next_action": _optional_text(record["next_action"], 320),
+    }
+
+
+def _e2e_result(record):
+    budgets = record["budgets"]
+    projected_budget = None
+    if budgets is not None:
+        projected_budget = {
+            "baseline_ref": safe_reference(budgets["baseline_ref"]),
+            "rationale": safe_text(budgets["rationale"], 400),
+            "thresholds": dict(sorted(budgets["thresholds"].items())),
+        }
+    viewport = record["viewport"]
+    return {
+        "journey_id": safe_reference(record["journey_id"]),
+        "executor_schema": safe_reference(record["executor_schema"]),
+        "measured_at": record["measured_at"],
+        "viewport": {
+            "class": viewport["class"],
+            "width": viewport["width"],
+            "height": viewport["height"],
+        },
+        "metrics": dict(sorted(record["metrics"].items())),
+        "artifact_ref": safe_reference(record["artifact_ref"]),
+        "baseline_ref": _optional_reference(record["baseline_ref"]),
+        "comparison": record["comparison"],
+        "budgets": projected_budget,
+        "next_action": _optional_text(record["next_action"], 320),
+    }
+
+
+def project_product_ux(records):
+    """Validate strict board contract first, then emit a smaller Pages whitelist."""
+    if not isinstance(records, list):
+        raise ValueError("Product/UX records must be a list")
+    if records:
+        validate_records(records)
+
+    proposals = [_product_proposal(r) for r in records if r.get("kind") == "product_proposal"]
+    findings = [_ux_finding(r) for r in records if r.get("kind") == "ux_finding"]
+
+    latest = {}
+    for record in records:
+        if record.get("kind") != "e2e_result":
+            continue
+        vp = record["viewport"]
+        key = (
+            record["journey_id"],
+            record["executor_schema"],
+            vp["class"],
+            vp["width"],
+            vp["height"],
+        )
+        measured = parse_time(record["measured_at"])
+        previous = latest.get(key)
+        if previous is None or measured > previous[0]:
+            latest[key] = (measured, record)
+
+    e2e_latest = [_e2e_result(latest[key][1]) for key in sorted(latest)]
+    proposals.sort(key=lambda r: r["proposal_id"])
+    findings.sort(key=lambda r: r["finding_id"])
+    return {
+        "proposals": proposals,
+        "ux_findings": findings,
+        "e2e_latest": e2e_latest,
+    }
+
+
+def load_product_ux_records(directory):
+    records = []
+    for path in sorted(Path(directory).glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            records.extend(data)
+        else:
+            records.append(data)
+    return records
+
+
+def build_output(rows, autonomy_snapshot, repository, product_records):
+    return {
+        "schema": "ai-bb-pages:v2",
+        "generated": True,
+        "tasks": rows,
+        "autonomy": project_autonomy(autonomy_snapshot, repository),
+        "product_ux": project_product_ux(product_records),
+    }
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--autonomy-input", required=True)
+    parser.add_argument("--product-ux-dir", default="data/product-ux-e2e")
+    parser.add_argument("--output", default="pages/board.json")
+    args = parser.parse_args()
+
     repo = os.environ.get("GITHUB_REPOSITORY")
     if not repo:
         raise SystemExit("GITHUB_REPOSITORY is required")
@@ -229,9 +536,14 @@ def main():
         state, owner, last = replay(issue, comments, now)
         rows.append(project_row(issue, state, owner, last))
     rows.sort(key=lambda r: int(r["task"][1:]))
-    output = {"schema": "ai-bb-pages:v1", "generated": True, "tasks": rows}
-    Path("pages").mkdir(exist_ok=True)
-    Path("pages/board.json").write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    autonomy_snapshot = json.loads(Path(args.autonomy_input).read_text(encoding="utf-8"))
+    product_records = load_product_ux_records(args.product_ux_dir)
+    output = build_output(rows, autonomy_snapshot, repo, product_records)
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
