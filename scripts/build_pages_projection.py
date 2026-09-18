@@ -22,6 +22,25 @@ EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT",
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
+SAFE_REFERENCE = re.compile(r"^[A-Za-z0-9._:/#@+\\-]+$")
+SAFE_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+EXACT_HEAD = re.compile(r"^PR:#?(\\d+)@([0-9a-f]{7,40})$")
+AUTONOMY_HEALTH_FIELDS = (
+    "main_status", "duplicate_workstream_violation", "review_storm",
+    "stale_review", "stale_or_expiring_claim", "history_unsafe", "human_required",
+)
+AUTONOMY_QUEUE_FIELDS = (
+    "task", "state", "agent", "lease_status", "review_needed", "current_head",
+    "next_action", "next_class", "waiting_reason",
+)
+NEXT_CLASSES = {
+    "broken-main/security", "live-claim", "review-needed", "implementation-ready",
+    "integration/verification", "idle/human-required",
+}
+MAIN_STATUSES = {"MAIN_GREEN", "MAIN_RED", "MAIN_UNKNOWN"}
+TASK_STATES = {"open", "claimed", "completed", "history_unsafe", "blocked"}
+LEASE_STATES = {"", "active", "expiring", "stale"}
+
 SAFE_FIELDS = ("task", "title", "state", "agent", "last_event", "last_activity_at", "lease_expires_at", "lease_status", "review_needed", "current_head", "next_action", "artifacts")
 CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[_-]?key\s*=|password\s*=|cookie\s*:|private[_ -]?key)")
 
