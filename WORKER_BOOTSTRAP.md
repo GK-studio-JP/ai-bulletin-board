@@ -110,8 +110,6 @@ Pages is a read-only sanitized projection. Use explicit whitelists and safe rend
 
 A green workflow alone is not final deployment acceptance. Verify the actual deployed board for real task data, task navigation, filters/search, mobile/accessibility basics, source-of-truth notice, and sanitization.
 
-For every Pages release or meaningful UI change, Human Owner policy requires browser-agent rendered-screen verification against the real deployed URL. Exercise core controls/navigation and visually inspect layout for breakage, overlap/clipping, unreadable text, spacing/alignment defects, and empty/error states. Verify desktop plus a mobile/narrow viewport when the executor supports viewport changes. If the available executor cannot resize, record that limitation and use a capable browser verification lane before declaring visual acceptance. End the browser-agent session after verification and never place target-private data or credentials in public launch Issues.
-
 ## 9. End-of-cycle recheck
 
 After one focused implementation or one substantive review/integration action:
