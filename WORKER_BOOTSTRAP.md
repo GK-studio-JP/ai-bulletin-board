@@ -34,6 +34,8 @@ Do not create a new implementation Issue when the same deliverable, acceptance c
 
 Default invariant: one stable workstream = one active canonical Issue.
 
+Authorized implementation Issues must carry exactly one `workstream: <stable-key>` line. Current GitHub-native admission CI validates newly opened/reopened implementation Issues and must remain green; a duplicate or missing required key blocks admission rather than authorizing a parallel lane.
+
 ## 3. Select exactly one next action
 
 Priority order:
