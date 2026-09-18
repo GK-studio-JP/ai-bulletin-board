@@ -22,7 +22,7 @@ REPO_REF_RE = re.compile(r"^[^/]+/[^@]+@[0-9a-f]{40}$")
 ROLE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 INSTALLATION_RE = re.compile(r"^aibb-[a-z0-9][a-z0-9-]{7,63}$")
 SECRET_REF_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,127}$")
-TASK_SCOPE_RE = re.compile(r"^(?:\\*|role:[a-z][a-z0-9_]*|workstream:[a-z0-9][a-z0-9._/-]{0,127})$")
+TASK_SCOPE_RE = re.compile(r"^(?:\*|role:[a-z][a-z0-9_]*|workstream:[a-z0-9][a-z0-9._/-]{0,127})$")
 
 LIFECYCLE_STATES = {
     "PLANNED", "PREFLIGHT", "INSTALLING", "ACTIVE", "UPGRADING",
