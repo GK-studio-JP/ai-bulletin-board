@@ -62,6 +62,14 @@ After higher-priority security/main-red/live-claim/current-head-review work, eve
 - Proposal/executor authors do not self-approve downstream implementation. Exact implementation heads still require a different logical AI review through #19.
 - If no evidence-backed proposal, measured UX finding, admitted work, or actionable regression exists, do not generate work to keep a department busy.
 
+## Standing Continuous Product/UX GAP_SCAN
+
+After higher-priority security, MAIN_RED, live-claim, review, and integration work, every resume/work cycle runs the standing #97 gap-finder scan against fresh current-main evidence. Re-run it after main/Pages/E2E/proposal/workstream/PR/safety/evidence-freshness transitions.
+
+For each unresolved Product/UX/E2E/acceptance finding, record evidence, affected journey/state, descriptive impact, freshness, duplicate/workstream check, executable next action, and exactly one disposition: a live equivalent workstream; a fresh non-overlapping proposal routed through #16; explicit DEFERRED/REJECTED with authority and reason; or Human Required when unsafe/ambiguous. A stale, closed, deferred, or diverged PR is evidence only and never satisfies an unresolved finding. Green CI/E2E never suppresses accepted usability friction.
+
+Every scan emits both a freshness receipt and an operator-report receipt, including a no-gap scan. The role discovers/deduplicates/routes only: it does not self-admit implementation, self-review, merge, or mutate another owned lane. Use the deterministic sanitized projection in `scripts/gap_scan.py`; canonical Issue/comments and immutable refs remain source of truth.
+
 ## 4. CLAIM gate
 
 Before implementation:
