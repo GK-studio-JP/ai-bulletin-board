@@ -80,9 +80,47 @@
         ]
       }
     ],
-    "state_effect_principals": [
-      "app.control-plane",
-      "team.integrators"
+    "state_effect_grants": [
+      {
+        "principal_id": "app.control-plane",
+        "capability": "claim",
+        "task_scope": "*"
+      },
+      {
+        "principal_id": "app.control-plane",
+        "capability": "heartbeat",
+        "task_scope": "*"
+      },
+      {
+        "principal_id": "app.control-plane",
+        "capability": "release",
+        "task_scope": "*"
+      },
+      {
+        "principal_id": "app.control-plane",
+        "capability": "progress",
+        "task_scope": "*"
+      },
+      {
+        "principal_id": "app.control-plane",
+        "capability": "handoff",
+        "task_scope": "*"
+      },
+      {
+        "principal_id": "app.control-plane",
+        "capability": "result",
+        "task_scope": "*"
+      },
+      {
+        "principal_id": "app.control-plane",
+        "capability": "review",
+        "task_scope": "role:review_manager"
+      },
+      {
+        "principal_id": "team.integrators",
+        "capability": "integrate",
+        "task_scope": "role:manager"
+      }
     ]
   },
   "release_manifest": {
@@ -114,8 +152,51 @@
     ],
     "artifacts": [
       {
+        "class": "acceptance_results",
         "name": "acceptance-results",
         "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      },
+      {
+        "class": "sanitized_e2e_product_ux",
+        "name": "sanitized-e2e-product-ux",
+        "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      },
+      {
+        "class": "security_privacy_sanitizer",
+        "name": "security-privacy-sanitizer-results",
+        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      },
+      {
+        "class": "permission_ruleset_environment",
+        "name": "permission-ruleset-environment-inventory",
+        "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      },
+      {
+        "class": "provenance_sbom",
+        "name": "provenance-sbom",
+        "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      },
+      {
+        "class": "audit_logs_findings",
+        "name": "audit-logs-findings",
+        "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "durable": true,
+        "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+      },
+      {
+        "class": "emergency_disable_revoke",
+        "name": "emergency-disable-revoke",
+        "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
         "durable": true,
         "provenance_ref": "release:ai-bb-v1.0.0-rc1"
       }
