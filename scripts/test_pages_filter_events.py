@@ -32,3 +32,64 @@ assert updates("change", "select")
 assert not updates("input", "select")
 
 print("PAGES_FILTER_EVENT_REGRESSION_OK")
+
+
+# v0.3 console remains a read-only presentation over the same sanitized board.json.
+console_contract = [
+    'id="v03-console"',
+    'id="health-panel"',
+    'id="human-required"',
+    'id="autonomy-groups"',
+    'id="review-queue"',
+    'id="product-proposals"',
+    'id="ux-findings"',
+    'id="e2e-latest"',
+    "function renderV03(data)",
+    "renderV03(data)",
+    "next_class",
+    "waiting_reason",
+    "review_queue",
+    "human_required",
+    "product_ux",
+    "visual_acceptance_status",
+    "baseline_ref",
+    "comparison",
+    "budgets",
+    "expected_user_value",
+    "acceptance_tests",
+]
+for snippet in console_contract:
+    assert snippet in html, f"missing v0.3 presentation contract: {snippet}"
+
+# New operational surfaces must not introduce another data source or unsafe HTML writes.
+assert html.count("fetch(") == 1
+assert "fetch('./board.json'" in html
+assert "innerHTML" not in html
+assert "localStorage" not in html
+assert "sessionStorage" not in html
+assert "method:'POST'" not in html
+assert 'method:"POST"' not in html
+
+# Presentation grouping is keyed by the sanitized next_class field. The same
+# deterministic rule is used for fixture/readiness reasoning before #30 lands.
+fixture_queue = [
+    {"task": "#1", "next_class": "review-needed"},
+    {"task": "#2", "next_class": "review-needed"},
+    {"task": "#3", "next_class": "idle/human-required"},
+    {"task": "#4"},
+]
+groups = {}
+for row in fixture_queue:
+    groups.setdefault(str(row.get("next_class") or "unclassified"), []).append(row["task"])
+assert groups == {
+    "review-needed": ["#1", "#2"],
+    "idle/human-required": ["#3"],
+    "unclassified": ["#4"],
+}
+
+assert "row.expected_user_value" in html
+assert "row.acceptance_tests" in html
+assert "row.value" not in html
+assert "row.acceptance)" not in html
+
+print("PAGES_V03_CONSOLE_REGRESSION_OK")
