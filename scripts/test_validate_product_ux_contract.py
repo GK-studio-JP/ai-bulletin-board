@@ -145,6 +145,14 @@ validate_record(baseline)
 validate_records([baseline])
 
 bad = copy.deepcopy(baseline)
+bad["measured_at"] = "not-a-timestamp"
+must_fail(bad, "valid ISO-8601")
+
+bad = copy.deepcopy(baseline)
+bad["measured_at"] = "2026-09-18T01:00:00"
+must_fail(bad, "include timezone")
+
+bad = copy.deepcopy(baseline)
 bad["comparison"] = "improved"
 must_fail(bad, "requires baseline_ref")
 
@@ -170,6 +178,14 @@ compared["budgets"] = {
 }
 validate_record(compared)
 validate_records([baseline, compared])
+
+same_time_baseline = copy.deepcopy(baseline)
+same_time_baseline["measured_at"] = compared["measured_at"]
+must_fail_records([same_time_baseline, compared], "strictly prior measured result")
+
+future_baseline = copy.deepcopy(baseline)
+future_baseline["measured_at"] = "2026-09-18T03:00:00Z"
+must_fail_records([future_baseline, compared], "strictly prior measured result")
 
 bad = copy.deepcopy(compared)
 bad["baseline_ref"] = "artifact:does-not-exist"
