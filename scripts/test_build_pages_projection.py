@@ -60,19 +60,114 @@ state, owner, _ = m.replay(issue, comments, T0 + timedelta(seconds=3))
 assert (state, owner) == ("completed", None)
 
 # Projection boundary is an explicit whitelist and never copies Issue/comment payloads.
-secret = event("CLAIM", "agent-safe", "privacy-1", "Authorization: Bearer super-secret-token-value")
+privacy_claim = event("CLAIM", "agent-safe", "privacy-claim")
+secret = event("PROGRESS", "agent-safe", "privacy-1", "Authorization: Bearer super-secret-token-value")
 secret["artifacts"] = ["PR:#53@97e0d877", "https://evil.example/raw", "token=secret"]
-c = comment(9, 0, secret)
-state, owner, last = m.replay(issue, [c], T0 + timedelta(seconds=1))
-row = m.project_row({"number": 1, "body": "RAW PRIVATE ISSUE BODY"}, state, owner, last)
+c = comment(9, 1, secret)
+state, owner, last = m.replay(issue, [comment(8, 0, privacy_claim), c], T0 + timedelta(seconds=2))
+row = m.project_row({"number": 1, "title": "Authorization: Bearer title-secret", "body": "RAW PRIVATE ISSUE BODY"}, state, owner, last)
 assert tuple(row.keys()) == m.SAFE_FIELDS
+assert row["title"] == "[redacted]"
 assert row["next_action"] == "[redacted]"
 assert row["artifacts"] == ["PR:#53@97e0d877"]
+assert row["last_activity_at"] == iso(T0 + timedelta(seconds=1))
+assert row["lease_expires_at"] == iso(T0 + timedelta(seconds=900))
+assert row["review_needed"] is True
+assert row["current_head"] == "PR:#53@97e0d877"
 serialized = __import__("json").dumps(row)
 assert "RAW PRIVATE ISSUE BODY" not in serialized
 assert "super-secret-token-value" not in serialized
+assert "title-secret" not in serialized
 assert "evil.example" not in serialized
 assert "token=secret" not in serialized
+
+# Exact-head REVIEW coverage clears review_needed without exposing review bodies.
+reviewed = event("REVIEW", "reviewer", "privacy-2", "checked")
+reviewed["artifacts"] = ["PR:#53@97e0d877"]
+state, owner, last = m.replay(issue, [comment(8, 0, privacy_claim), c, comment(10, 2, reviewed)], T0 + timedelta(seconds=3))
+row = m.project_row({"number": 1, "title": "Safe title"}, state, owner, last)
+assert row["review_needed"] is False
+assert row["current_head"] == "PR:#53@97e0d877"
+assert row["last_activity_at"] == iso(T0 + timedelta(seconds=2))
+
+# Stale lease evidence survives later non-ownership activity after expiry.
+stale_claim = event("CLAIM", "lease-owner", "lease-1")
+stale_review = event("REVIEW", "reviewer", "lease-2")
+state, owner, last = m.replay(
+    issue,
+    [comment(20, 0, stale_claim), comment(21, 901, stale_review)],
+    T0 + timedelta(seconds=902),
+)
+row = m.project_row({"number": 1, "title": "Lease task"}, state, owner, last)
+assert (state, owner) == ("open", None)
+assert row["lease_expires_at"] == iso(T0 + timedelta(seconds=900))
+assert row["lease_status"] == "stale"
+
+# Review coverage is exact-head and must come from a different logical agent.
+head1 = "PR:#53@1111111"
+head2 = "PR:#53@2222222"
+owner_claim = event("CLAIM", "author", "head-claim")
+produced1 = event("PROGRESS", "author", "head-1")
+produced1["artifacts"] = [head1]
+produced2 = event("PROGRESS", "author", "head-2")
+produced2["artifacts"] = [head2]
+stale_review = event("REVIEW", "reviewer", "head-review-old")
+stale_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(30, 0, owner_claim), comment(31, 1, produced1), comment(32, 2, produced2), comment(33, 3, stale_review)],
+    T0 + timedelta(seconds=4),
+)
+row = m.project_row({"number": 1, "title": "Review task"}, state, owner, last)
+assert row["current_head"] == head2
+assert row["review_needed"] is True
+
+# A later non-review mention of an already-seen older head must not regress current_head.
+stale_nonreview = event("PROGRESS", "manager", "head-stale-nonreview")
+stale_nonreview["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(40, 0, owner_claim), comment(41, 1, produced1), comment(42, 2, produced2), comment(43, 3, stale_nonreview)],
+    T0 + timedelta(seconds=4),
+)
+row = m.project_row({"number": 1, "title": "Non-regressive head task"}, state, owner, last)
+assert row["current_head"] == head2
+assert row["review_needed"] is True
+
+self_review = event("REVIEW", "author", "head-self-review")
+self_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(50, 0, owner_claim), comment(51, 1, produced1), comment(52, 2, self_review)],
+    T0 + timedelta(seconds=3),
+)
+row = m.project_row({"number": 1, "title": "Self review task"}, state, owner, last)
+assert row["review_needed"] is True
+
+# A non-owner mention cannot establish or overwrite implementation-head authorship.
+manager_mention = event("PROGRESS", "manager", "head-manager-mention")
+manager_mention["artifacts"] = [head1]
+author_review = event("REVIEW", "author", "head-author-review")
+author_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(60, 0, owner_claim), comment(61, 1, manager_mention), comment(62, 2, produced1), comment(63, 3, author_review)],
+    T0 + timedelta(seconds=4),
+)
+row = m.project_row({"number": 1, "title": "Author attribution task"}, state, owner, last)
+assert row["current_head"] == head1
+assert row["review_needed"] is True
+
+independent_review = event("REVIEW", "other-reviewer", "head-independent-review")
+independent_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(70, 0, owner_claim), comment(71, 1, manager_mention), comment(72, 2, produced1), comment(73, 3, independent_review)],
+    T0 + timedelta(seconds=4),
+)
+row = m.project_row({"number": 1, "title": "Independent review task"}, state, owner, last)
+assert row["current_head"] == head1
+assert row["review_needed"] is False
 
 # Benign display strings are bounded and normalized.
 assert m.safe_text("  review   PR #53  ") == "review PR #53"

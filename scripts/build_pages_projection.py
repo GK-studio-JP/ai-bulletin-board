@@ -19,7 +19,7 @@ EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT",
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
-SAFE_FIELDS = ("task", "state", "agent", "last_event", "next_action", "artifacts")
+SAFE_FIELDS = ("task", "title", "state", "agent", "last_event", "last_activity_at", "lease_expires_at", "lease_status", "review_needed", "current_head", "next_action", "artifacts")
 CREDENTIAL_LIKE = re.compile(r"(?i)(?:authorization\s*:|bearer\s+|token\s*=|api[_-]?key\s*=|password\s*=|cookie\s*:|private[_ -]?key)")
 
 
@@ -111,8 +111,13 @@ def replay(issue, comments, now):
     seen = {}
     owner = None
     expiry = None
+    last_lease_expiry = None
     completed = False
     last = None
+    current_head = ""
+    reviewed_heads = set()
+    head_authors = {}
+    seen_heads = set()
     for created, cid, p, c in events:
         key = p["idempotency_key"]
         normalized = json.dumps(p, sort_keys=True, separators=(",", ":"))
@@ -124,25 +129,43 @@ def replay(issue, comments, now):
         last = (created, cid, p, c)
         typ = p["type"]
         # Lease expiry is a derived event-boundary fact. Clear stale ownership
-        # before evaluating any later ownership-sensitive event.
+        # before evaluating any ownership-sensitive event or projection authorship.
         if owner is not None and expiry is not None and created >= expiry:
             owner = None
             expiry = None
         live = owner is not None and expiry is not None
+        heads = [x for x in p.get("artifacts", []) if re.fullmatch(r"PR:#?\d+@[0-9a-f]{7,40}", x)]
+        if heads:
+            if typ == "REVIEW":
+                for head in heads:
+                    author = head_authors.get(head)
+                    if author and p["agent_id"] != author:
+                        reviewed_heads.add(head)
+            elif typ in {"PROGRESS", "HANDOFF", "RESULT"} and live and p["agent_id"] == owner:
+                for head in heads:
+                    if head in seen_heads:
+                        continue
+                    seen_heads.add(head)
+                    current_head = head
+                    head_authors.setdefault(head, p["agent_id"])
         if typ == "CLAIM":
             if not live and not completed:
                 owner = p["agent_id"]
                 expiry = created + timedelta(seconds=LEASE_SECONDS)
+                last_lease_expiry = expiry
         elif typ == "HEARTBEAT":
             if live and p["agent_id"] == owner:
                 expiry = created + timedelta(seconds=LEASE_SECONDS)
+                last_lease_expiry = expiry
         elif typ == "RELEASE":
             if live and p["agent_id"] == owner:
                 owner = expiry = None
+                last_lease_expiry = None
         elif typ == "RESULT":
             if live and p["agent_id"] == owner:
                 completed = True
                 owner = expiry = None
+                last_lease_expiry = None
     if completed:
         state = "completed"
     elif owner is not None and expiry is not None and now < expiry:
@@ -150,6 +173,22 @@ def replay(issue, comments, now):
     else:
         state = "open"
         owner = None
+    if last is not None:
+        lease_status = ""
+        display_expiry = expiry if owner is not None and expiry is not None else last_lease_expiry
+        if display_expiry is not None:
+            if owner is not None and expiry is not None and now < expiry:
+                lease_status = "expiring" if expiry - now <= timedelta(seconds=300) else "active"
+            elif now >= display_expiry:
+                lease_status = "stale"
+        meta = {
+            "last_activity_at": last[0].astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "lease_expires_at": display_expiry.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if display_expiry is not None else "",
+            "lease_status": lease_status,
+            "review_needed": bool(current_head and current_head not in reviewed_heads),
+            "current_head": current_head,
+        }
+        last = (*last, meta)
     return state, owner, last
 
 
@@ -159,11 +198,18 @@ def safe_artifacts(items):
 def project_row(issue, state, owner, last):
     """Explicit whitelist boundary between GitHub payloads and Pages JSON."""
     p = last[2] if last else {}
+    meta = last[4] if last and len(last) > 4 else {}
     row = {
         "task": f"#{issue['number']}",
+        "title": safe_text(issue.get("title") or "", 180),
         "state": state,
         "agent": safe_text(owner or "", 160),
         "last_event": p.get("type", "") if p.get("type") in EVENT_TYPES else "",
+        "last_activity_at": meta.get("last_activity_at", ""),
+        "lease_expires_at": meta.get("lease_expires_at", ""),
+        "lease_status": meta.get("lease_status", "") if meta.get("lease_status", "") in {"", "active", "expiring", "stale"} else "",
+        "review_needed": bool(meta.get("review_needed", False)),
+        "current_head": meta.get("current_head", "") if SAFE_ARTIFACT.fullmatch(meta.get("current_head", "")) else "",
         "next_action": safe_text(p.get("next_action") or ""),
         "artifacts": safe_artifacts(p.get("artifacts", [])),
     }
