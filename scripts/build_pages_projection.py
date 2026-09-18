@@ -128,6 +128,12 @@ def replay(issue, comments, now):
         seen[key] = normalized
         last = (created, cid, p, c)
         typ = p["type"]
+        # Lease expiry is a derived event-boundary fact. Clear stale ownership
+        # before evaluating any ownership-sensitive event or projection authorship.
+        if owner is not None and expiry is not None and created >= expiry:
+            owner = None
+            expiry = None
+        live = owner is not None and expiry is not None
         heads = [x for x in p.get("artifacts", []) if re.fullmatch(r"PR:#?\d+@[0-9a-f]{7,40}", x)]
         if heads:
             if typ == "REVIEW":
@@ -135,19 +141,13 @@ def replay(issue, comments, now):
                     author = head_authors.get(head)
                     if author and p["agent_id"] != author:
                         reviewed_heads.add(head)
-            else:
+            elif typ in {"PROGRESS", "HANDOFF", "RESULT"} and live and p["agent_id"] == owner:
                 for head in heads:
                     if head in seen_heads:
                         continue
                     seen_heads.add(head)
                     current_head = head
                     head_authors.setdefault(head, p["agent_id"])
-        # Lease expiry is a derived event-boundary fact. Clear stale ownership
-        # before evaluating any later ownership-sensitive event.
-        if owner is not None and expiry is not None and created >= expiry:
-            owner = None
-            expiry = None
-        live = owner is not None and expiry is not None
         if typ == "CLAIM":
             if not live and not completed:
                 owner = p["agent_id"]
