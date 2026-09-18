@@ -55,6 +55,8 @@ console_contract = [
     "baseline_ref",
     "comparison",
     "budgets",
+    "expected_user_value",
+    "acceptance_tests",
 ]
 for snippet in console_contract:
     assert snippet in html, f"missing v0.3 presentation contract: {snippet}"
@@ -73,7 +75,7 @@ assert 'method:"POST"' not in html
 fixture_queue = [
     {"task": "#1", "next_class": "review-needed"},
     {"task": "#2", "next_class": "review-needed"},
-    {"task": "#3", "next_class": "human-required"},
+    {"task": "#3", "next_class": "idle/human-required"},
     {"task": "#4"},
 ]
 groups = {}
@@ -81,8 +83,13 @@ for row in fixture_queue:
     groups.setdefault(str(row.get("next_class") or "unclassified"), []).append(row["task"])
 assert groups == {
     "review-needed": ["#1", "#2"],
-    "human-required": ["#3"],
+    "idle/human-required": ["#3"],
     "unclassified": ["#4"],
 }
+
+assert "row.expected_user_value" in html
+assert "row.acceptance_tests" in html
+assert "row.value" not in html
+assert "row.acceptance)" not in html
 
 print("PAGES_V03_CONSOLE_REGRESSION_OK")
