@@ -13,7 +13,7 @@ import os
 import re
 import urllib.request
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import build_pages_projection as projection
@@ -85,20 +85,72 @@ def main_check_state(check_runs):
     return "MAIN_UNKNOWN"
 
 
-def review_evidence(comments, current_head):
+def review_evidence(comments, current_head, issue_number):
+    """Count only canonical independent review evidence under replay semantics."""
+    events = []
+    for c in comments:
+        body = c.get("body") or ""
+        if projection.MARKER not in body:
+            continue
+        created = projection.parse_time(c["created_at"])
+        updated = c.get("updated_at")
+        if updated and projection.parse_time(updated) != created:
+            return 0, 0
+        p = projection.payload(body)
+        if p is not None and projection.canonical(p, issue_number):
+            events.append((created, int(c["id"]), p))
+    events.sort(key=lambda x: (x[0], x[1]))
+
+    seen = {}
+    owner = None
+    expiry = None
+    completed = False
+    head_authors = {}
     current_reviewers = set()
     stale_reviewers = set()
-    for c in comments:
-        p = projection.payload(c.get("body") or "")
-        if not p or p.get("type") != "REVIEW":
+
+    for created, _cid, p in events:
+        key = p["idempotency_key"]
+        normalized = json.dumps(p, sort_keys=True, separators=(",", ":"))
+        if key in seen:
             continue
-        for artifact in p.get("artifacts", []):
-            if not HEAD_RE.fullmatch(artifact):
-                continue
-            if artifact == current_head:
-                current_reviewers.add(p.get("agent_id") or "")
-            else:
-                stale_reviewers.add(p.get("agent_id") or "")
+        seen[key] = normalized
+
+        if owner is not None and expiry is not None and created >= expiry:
+            owner = None
+            expiry = None
+        live = owner is not None and expiry is not None
+        typ = p["type"]
+        heads = [x for x in p.get("artifacts", []) if HEAD_RE.fullmatch(x)]
+
+        if typ == "REVIEW":
+            for head in heads:
+                author = head_authors.get(head)
+                if not author or p["agent_id"] == author:
+                    continue
+                if head == current_head:
+                    current_reviewers.add(p["agent_id"])
+                else:
+                    stale_reviewers.add(p["agent_id"])
+        elif typ in {"PROGRESS", "HANDOFF", "RESULT"} and live and p["agent_id"] == owner:
+            for head in heads:
+                head_authors.setdefault(head, p["agent_id"])
+
+        if typ == "CLAIM":
+            if not live and not completed:
+                owner = p["agent_id"]
+                expiry = created + timedelta(seconds=projection.LEASE_SECONDS)
+        elif typ == "HEARTBEAT":
+            if live and p["agent_id"] == owner:
+                expiry = created + timedelta(seconds=projection.LEASE_SECONDS)
+        elif typ == "RELEASE":
+            if live and p["agent_id"] == owner:
+                owner = expiry = None
+        elif typ == "RESULT":
+            if live and p["agent_id"] == owner:
+                completed = True
+                owner = expiry = None
+
     return len(current_reviewers), len(stale_reviewers)
 
 
@@ -187,11 +239,11 @@ def collect(repo: str):
         referenced_sha = m.group(2)
         if exact_head and not exact_head.startswith(referenced_sha):
             # The task references a stale head; retain it as stale evidence only.
-            review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head)
+            review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head, int(row["task"][1:]))
             stale_count += review_count
             review_count = 0
         else:
-            review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head)
+            review_count, stale_count = review_evidence(comments_by_issue[int(row["task"][1:])], head, int(row["task"][1:]))
         review_meta.append({
             "pr": pr_number,
             "head": head,
