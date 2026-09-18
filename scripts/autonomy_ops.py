@@ -97,6 +97,14 @@ def same_head(artifact, target):
     return bool(left and right and left[0] == right[0] and (left[1].startswith(right[1]) or right[1].startswith(left[1])))
 
 
+def head_author(head_authors, head):
+    """Resolve producer attribution across equivalent short/full SHA artifacts."""
+    for produced_head, author in head_authors.items():
+        if same_head(produced_head, head):
+            return author
+    return None
+
+
 def review_evidence(comments, current_head, issue_number):
     """Count only canonical independent review evidence under replay semantics."""
     events = []
@@ -137,7 +145,7 @@ def review_evidence(comments, current_head, issue_number):
 
         if typ == "REVIEW":
             for head in heads:
-                author = head_authors.get(head)
+                author = head_author(head_authors, head)
                 if not author or p["agent_id"] == author:
                     continue
                 if same_head(head, current_head):
@@ -146,7 +154,8 @@ def review_evidence(comments, current_head, issue_number):
                     stale_reviewers.add(p["agent_id"])
         elif typ in {"PROGRESS", "HANDOFF", "RESULT"} and live and p["agent_id"] == owner:
             for head in heads:
-                head_authors.setdefault(head, p["agent_id"])
+                if head_author(head_authors, head) is None:
+                    head_authors[head] = p["agent_id"]
 
         if typ == "CLAIM":
             if not live and not completed:
