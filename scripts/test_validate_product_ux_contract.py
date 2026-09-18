@@ -146,7 +146,7 @@ validate_records([baseline])
 
 bad = copy.deepcopy(baseline)
 bad["measured_at"] = "not-a-timestamp"
-must_fail(bad, "valid ISO-8601")
+must_fail(bad, "ISO-8601 date-time")
 
 bad = copy.deepcopy(baseline)
 bad["measured_at"] = "2026-09-18T01:00:00"
