@@ -106,10 +106,15 @@ expected_negative_names = {
     "public-issue-browser-transport",
     "incompatible-downgrade",
     "missing-installation-id",
+    "missing-resource-map",
     "duplicate-role-binding",
     "release-component-missing-digest",
+    "release-missing-core-workflows-identities",
     "evidence-artifact-missing-digest",
+    "missing-required-evidence-class",
     "credential-like-secret-material",
+    "mapped-principal-capability-mismatch",
+    "fixed-issue-task-scope",
 }
 assert expected_negative_names <= names
 
