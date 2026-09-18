@@ -22,9 +22,9 @@ EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT",
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
-SAFE_REFERENCE = re.compile(r"^[A-Za-z0-9._:/#@+\\-]+$")
+SAFE_REFERENCE = re.compile(r"^[A-Za-z0-9._:/#@+\-]+$")
 SAFE_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-EXACT_HEAD = re.compile(r"^PR:#?(\\d+)@([0-9a-f]{7,40})$")
+EXACT_HEAD = re.compile(r"^PR:#?(\d+)@([0-9a-f]{7,40})$")
 AUTONOMY_HEALTH_FIELDS = (
     "main_status", "duplicate_workstream_violation", "review_storm",
     "stale_review", "stale_or_expiring_claim", "history_unsafe", "human_required",
