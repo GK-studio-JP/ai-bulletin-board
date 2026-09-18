@@ -5,8 +5,14 @@
     "ops": [
       {
         "op": "set",
-        "path": ["installation_state", "roles"],
-        "value": {"#16": 101, "review_manager": 102}
+        "path": [
+          "installation_state",
+          "roles"
+        ],
+        "value": {
+          "#16": 101,
+          "review_manager": 102
+        }
       }
     ]
   },
@@ -16,8 +22,17 @@
     "ops": [
       {
         "op": "set",
-        "path": ["authorization_policy", "state_effect_principals"],
-        "value": ["app.control-plane", "user.unknown"]
+        "path": [
+          "authorization_policy",
+          "state_effect_grants"
+        ],
+        "value": [
+          {
+            "principal_id": "user.unknown",
+            "capability": "claim",
+            "task_scope": "*"
+          }
+        ]
       }
     ]
   },
@@ -27,7 +42,12 @@
     "ops": [
       {
         "op": "set",
-        "path": ["release_manifest", "actions", 0, "uses"],
+        "path": [
+          "release_manifest",
+          "actions",
+          0,
+          "uses"
+        ],
         "value": "actions/checkout@v4"
       }
     ]
@@ -38,12 +58,18 @@
     "ops": [
       {
         "op": "set",
-        "path": ["project_config", "profile"],
+        "path": [
+          "project_config",
+          "profile"
+        ],
         "value": "private-no-public-console"
       },
       {
         "op": "set",
-        "path": ["project_config", "console"],
+        "path": [
+          "project_config",
+          "console"
+        ],
         "value": {
           "mode": "public-pages",
           "data_classification": "private",
@@ -52,7 +78,10 @@
       },
       {
         "op": "set",
-        "path": ["release_manifest", "supported_profile"],
+        "path": [
+          "release_manifest",
+          "supported_profile"
+        ],
         "value": "private-no-public-console"
       }
     ]
@@ -63,8 +92,14 @@
     "ops": [
       {
         "op": "set",
-        "path": ["project_config", "browser"],
-        "value": {"enabled": true, "transport": "public-issue"}
+        "path": [
+          "project_config",
+          "browser"
+        ],
+        "value": {
+          "enabled": true,
+          "transport": "public-issue"
+        }
       }
     ]
   },
@@ -74,10 +109,15 @@
     "ops": [
       {
         "op": "set",
-        "path": ["compatibility", "requested_downgrade"],
+        "path": [
+          "compatibility",
+          "requested_downgrade"
+        ],
         "value": {
           "target_version": "0.9.0",
-          "target_supported_persisted_schema_versions": ["ai-bb-productization:v1"]
+          "target_supported_persisted_schema_versions": [
+            "ai-bb-productization:v1"
+          ]
         }
       }
     ]
@@ -88,7 +128,10 @@
     "ops": [
       {
         "op": "delete",
-        "path": ["installation_state", "installation_id"]
+        "path": [
+          "installation_state",
+          "installation_id"
+        ]
       }
     ]
   },
@@ -98,7 +141,11 @@
     "ops": [
       {
         "op": "set",
-        "path": ["installation_state", "roles", "product_ux"],
+        "path": [
+          "installation_state",
+          "roles",
+          "product_ux"
+        ],
         "value": 101
       }
     ]
@@ -109,7 +156,12 @@
     "ops": [
       {
         "op": "delete",
-        "path": ["release_manifest", "components", "core", "digest"]
+        "path": [
+          "release_manifest",
+          "components",
+          "core",
+          "digest"
+        ]
       }
     ]
   },
@@ -119,7 +171,12 @@
     "ops": [
       {
         "op": "delete",
-        "path": ["evidence_manifest", "artifacts", 0, "digest"]
+        "path": [
+          "evidence_manifest",
+          "artifacts",
+          0,
+          "digest"
+        ]
       }
     ]
   },
@@ -129,8 +186,114 @@
     "ops": [
       {
         "op": "set",
-        "path": ["installation_state", "resources", 0, "owner_marker"],
+        "path": [
+          "installation_state",
+          "resources",
+          0,
+          "owner_marker"
+        ],
         "value": "github_pat_example_should_never_be_persisted"
+      }
+    ]
+  },
+  {
+    "name": "missing-resource-map",
+    "contains": "at least one managed resource",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "installation_state",
+          "resources"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "release-missing-core-workflows-identities",
+    "contains": "must include core and workflows components",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "release_manifest",
+          "components"
+        ],
+        "value": {
+          "module_a": {
+            "repository": "example/ai-bulletin-board-core",
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "module_b": {
+            "repository": "example/ai-bulletin-board-core",
+            "commit_sha": "2222222222222222222222222222222222222222",
+            "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "missing-required-evidence-class",
+    "contains": "missing required evidence classes",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "evidence_manifest",
+          "artifacts"
+        ],
+        "value": [
+          {
+            "class": "acceptance_results",
+            "name": "acceptance-results",
+            "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "durable": true,
+            "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "mapped-principal-capability-mismatch",
+    "contains": "principal lacks capability",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "authorization_policy",
+          "state_effect_grants"
+        ],
+        "value": [
+          {
+            "principal_id": "team.integrators",
+            "capability": "claim",
+            "task_scope": "role:manager"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "fixed-issue-task-scope",
+    "contains": "task scope must be symbolic",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "authorization_policy",
+          "state_effect_grants"
+        ],
+        "value": [
+          {
+            "principal_id": "app.control-plane",
+            "capability": "claim",
+            "task_scope": "#16"
+          }
+        ]
       }
     ]
   }
