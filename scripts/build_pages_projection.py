@@ -111,6 +111,7 @@ def replay(issue, comments, now):
     seen = {}
     owner = None
     expiry = None
+    last_lease_expiry = None
     completed = False
     last = None
     current_head = ""
@@ -135,7 +136,7 @@ def replay(issue, comments, now):
                         reviewed_heads.add(head)
             else:
                 current_head = heads[-1]
-                head_authors[current_head] = p["agent_id"]
+                head_authors.setdefault(current_head, p["agent_id"])
         # Lease expiry is a derived event-boundary fact. Clear stale ownership
         # before evaluating any later ownership-sensitive event.
         if owner is not None and expiry is not None and created >= expiry:
@@ -146,16 +147,20 @@ def replay(issue, comments, now):
             if not live and not completed:
                 owner = p["agent_id"]
                 expiry = created + timedelta(seconds=LEASE_SECONDS)
+                last_lease_expiry = expiry
         elif typ == "HEARTBEAT":
             if live and p["agent_id"] == owner:
                 expiry = created + timedelta(seconds=LEASE_SECONDS)
+                last_lease_expiry = expiry
         elif typ == "RELEASE":
             if live and p["agent_id"] == owner:
                 owner = expiry = None
+                last_lease_expiry = None
         elif typ == "RESULT":
             if live and p["agent_id"] == owner:
                 completed = True
                 owner = expiry = None
+                last_lease_expiry = None
     if completed:
         state = "completed"
     elif owner is not None and expiry is not None and now < expiry:
@@ -165,14 +170,15 @@ def replay(issue, comments, now):
         owner = None
     if last is not None:
         lease_status = ""
-        if expiry is not None:
-            if owner is not None and now < expiry:
+        display_expiry = expiry if owner is not None and expiry is not None else last_lease_expiry
+        if display_expiry is not None:
+            if owner is not None and expiry is not None and now < expiry:
                 lease_status = "expiring" if expiry - now <= timedelta(seconds=300) else "active"
-            elif now >= expiry:
+            elif now >= display_expiry:
                 lease_status = "stale"
         meta = {
             "last_activity_at": last[0].astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "lease_expires_at": expiry.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if expiry is not None else "",
+            "lease_expires_at": display_expiry.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if display_expiry is not None else "",
             "lease_status": lease_status,
             "review_needed": bool(current_head and current_head not in reviewed_heads),
             "current_head": current_head,
