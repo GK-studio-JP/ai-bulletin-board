@@ -31,7 +31,7 @@ Persisted productization config and manifests contain secret **references/names 
 
 ## 4. Trust and authorization
 
-`agent_id` is audit identity and never authentication. Product state-effect authorization is a separate GitHub-native policy. Only configured GitHub principals (App installation, user, or team identity) mapped to explicit capabilities may be state-effective. Marker-bearing comments from unmapped principals are audit-only.
+`agent_id` is audit identity and never authentication. Product state-effect authorization is a separate GitHub-native policy. Only configured GitHub principals (App installation, user, or team identity) may be state-effective, and every state effect is represented by an explicit grant binding `principal_id` + `capability` + symbolic `task_scope`. Task scope is either `*`, `role:<symbolic-role>`, or `workstream:<stable-key>`; fixed Issue-number scopes are forbidden. A grant is invalid if the principal is unmapped or if the granted capability is absent from that principal's declared capability set. Marker-bearing comments without a matching principal/capability/task grant are audit-only.
 
 Worker, reviewer, integrator, and deployer capabilities are separable. Production, destructive, account, permission, and security-sensitive actions remain Human Required.
 
@@ -89,7 +89,7 @@ Accessibility/mobile/language are release gates: keyboard operation, screen-read
 
 A release manifest pins immutable core/protocol/schema/workflow/module/adapter identities and digests, supported profile, config schema, executable Action SHAs, and SBOM/provenance digest.
 
-A durable evidence manifest is independent of Actions artifact retention and includes release manifest digest, exact reference-project commits, acceptance results, sanitized E2E/Product-UX evidence, security/privacy/sanitizer results, permission/ruleset/environment inventory, relevant findings/log references, provenance/SBOM, audit locations, and emergency disable/revoke guidance.
+A durable evidence manifest is independent of Actions artifact retention and includes release manifest digest and exact reference-project commits. Its artifact inventory must machine-cover every required class: `acceptance_results`, `sanitized_e2e_product_ux`, `security_privacy_sanitizer`, `permission_ruleset_environment`, `provenance_sbom`, `audit_logs_findings`, and `emergency_disable_revoke`. Each class carries a durable content digest and provenance reference; a bundle missing any required class is invalid.
 
 Component evidence may be reused only when immutable identities match. Package-level install/permission/generated-state/deployment evidence is rerun for the packaged release.
 
@@ -98,13 +98,14 @@ Component evidence may be reused only when immutable identities match. Package-l
 The offline validator and fixtures must reject at least:
 
 - fixed Issue-number role identity instead of symbolic roles;
-- state-effect authorization referencing an unmapped GitHub principal;
+- empty/missing managed resource inventory;
+- state-effect authorization referencing an unmapped GitHub principal, granting a capability the principal does not hold, or using a fixed Issue-number task scope;
 - mutable executable Action references;
 - private classification combined with public Pages;
 - public-Issue browser command/result transport;
 - incompatible downgrade after a newer persisted schema/event version;
 - missing installation identity/resource map or duplicate role binding;
-- release/evidence manifests missing immutable identity/digest.
+- release/evidence manifests missing immutable identity/digest, mandatory `core`/`workflows` component identities, or any required durable evidence class.
 
 The validator must run with Python standard library only, no network, no GitHub token, and no secret values.
 
