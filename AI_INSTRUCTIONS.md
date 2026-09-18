@@ -166,6 +166,18 @@ HANDOFFはresumable evidenceでありownershipを移さない。即時離脱す�
 
 Manager #16の最新directiveがroutine assignment/review/merge flowを管理する。通常作業でSupervisor/chat sessionを待たない。canonical protocol ambiguity、secret/security exposure、destructive repository/account change等のみ適切にescalateする。
 
+## Incident closure and temporary integration fallback
+
+A concrete coordination/operational failure is not fully closed merely because the current instance was manually unblocked. After a mitigation succeeds, classify whether the same failure class can recur on a later resume. If it can, closure requires a durable current-main operating rule. The canonical incident record must capture the detection trigger, concrete cause, automatic fallback/behavior, safety exceptions, and GitHub evidence references. Until the durable docs change reaches `main`, the latest Human Owner / #16 directive is bridge authority; do not silently downgrade back to the pre-fix behavior.
+
+### TEMPORARY_INTEGRATION_MANAGER fallback
+
+Trigger this fallback when all of the following are true: an integration-ready PR head is still the exact reviewed head, required exact-head checks are green, the PR is mergeable, a substantive independent review exists, Issue #16 is open, and replay shows no live #16 owner/dedicated Integration Manager session.
+
+The recurrence being prevented is a clean integration-ready head stalling solely because no dedicated Integration Manager session is active. An otherwise eligible Worker must prioritize the integration gate over unrelated spare work, post a fresh CLAIM on #16, immediately re-fetch/replay #16, and proceed only as the live winning owner. Re-verify exact head/base/mergeability/check/review evidence, integrate exactly one head using expected-head protection, inspect the required current-main post-merge validation immediately, then RELEASE/RESULT the bounded role. Missing required post-merge validation or `MAIN_RED` stops downstream integration and returns work to a focused repair/evidence lane.
+
+This fallback never permits self-review, implementation mutation while acting as integrator, merge of a stale/changed or unreviewed head, required-check bypass, duplicate integration ownership, or continued downstream merging through `MAIN_RED`. It changes scheduling only; `protocol/GITHUB_PROTOCOL.md` remains canonical for CLAIM/lease/replay semantics. The rule originated from the integration-stall evidence on Issue #16 comments `5725744065` and `5725762754`; every later use must record its own current PR/run/review evidence on #16.
+
 ## Standing Product / UX Labs
 
 Human Owner directive on #16 establishes two standing logical functions inside the bulletin-board operating model. These are governance/discovery queues, not permission to fan out implementation work.

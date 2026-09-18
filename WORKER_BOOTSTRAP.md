@@ -44,9 +44,10 @@ Priority order:
 2. broken main or failed required check;
 3. your live CLAIM needing implementation/fix;
 4. another AI's current-head PR lacking substantive independent review;
-5. Manager-dispatched implementation;
-6. integration/rebase/tests/deployment acceptance;
-7. otherwise post one evidence-based IDLE report to #16 and stop.
+5. an integration-ready exact reviewed head when #16 has no live owner: assume the bounded TEMPORARY_INTEGRATION_MANAGER role through fresh #16 CLAIM/replay;
+6. Manager-dispatched implementation;
+7. integration/rebase/tests/deployment acceptance not covered by the temporary integration fallback;
+8. otherwise post one evidence-based IDLE report to #16 and stop.
 
 Do not invent work or create planning Issues to appear busy.
 
@@ -115,6 +116,18 @@ If main becomes red:
 
 Branch-green evidence does not prove sequential main integration safety.
 
+### Temporary Integration Manager fallback
+
+Use this only to prevent the recurring failure where an integration-ready head stalls solely because no dedicated Integration Manager session is active.
+
+**Detection trigger:** the candidate is the exact independently reviewed head, required exact-head checks are green, it is mergeable, Issue #16 is open, and canonical replay shows no live #16 owner.
+
+**Automatic behavior:** an otherwise eligible Worker prioritizes this integration gate over unrelated spare work, posts a fresh CLAIM on #16, immediately re-fetches/replays #16, and acts only if it is the live winning owner. Re-verify exact head/base/mergeability/check/review evidence, merge exactly one head with expected-head protection, then immediately inspect the required current-main post-merge validation. RELEASE/RESULT the temporary role after that bounded integration action. Missing required validation or `MAIN_RED` stops the queue and routes a focused repair/evidence lane.
+
+**Safety exceptions:** no self-review; no implementation mutation while holding the integration role; no stale/changed/unreviewed head merge; no required-check bypass; no merge when another live #16 owner exists; no downstream integration through `MAIN_RED`.
+
+This is operating/scheduling policy, not a new CLAIM semantic. Follow `protocol/GITHUB_PROTOCOL.md` for ownership/lease/replay. Initial evidence for this fallback is Issue #16 comments `5725744065` and `5725762754`; record current evidence for each use.
+
 ## 8. Pages/privacy acceptance
 
 Pages is a read-only sanitized projection. Use explicit whitelists and safe rendering. Never publish raw Issue bodies/comments, credentials, tokens, secrets, or private protocol payloads.
@@ -138,7 +151,21 @@ If actionable work remains, return to Rule refresh automatically. Do not wait fo
 
 Stop only when truly idle, when Human approval is required for a destructive/account/security decision, or when an unresolved canonical conflict cannot be resolved by workers/managers.
 
-## 10. Anti-loop guards
+## 10. Incident closure / recurrence prevention
+
+After a coordination or operational failure is concretely resolved, classify whether the same failure can recur on a later resume. If yes, the incident is not operationally closed until the successful mitigation is converted into a durable current-main rule.
+
+The canonical incident-closure record must include:
+
+- detection trigger;
+- concrete cause;
+- automatic fallback/behavior that prevented or resolved recurrence;
+- safety exceptions / stop conditions;
+- GitHub evidence references (Issue comments, exact PR head, checks/runs/artifacts as applicable).
+
+Until the durable rule is merged, the latest Human Owner / #16 directive is bridge authority. Do not treat a one-off manual workaround as permanent closure, and do not broaden a local mitigation into unrelated protocol changes.
+
+## 11. Anti-loop guards
 
 - One cycle = one focused implementation or one substantive review/integration action.
 - Do not repeat comments/Issues/PRs when state has not changed.
