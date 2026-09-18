@@ -50,6 +50,17 @@ Priority order:
 
 Do not invent work or create planning Issues to appear busy.
 
+## Standing Product / UX queues
+
+After higher-priority security/main-red/live-claim/current-head-review work, every resume cycle also inspects the owner-mandated standing Product / Feature Lab and UX / UI Optimization Lab queues.
+
+- Product / Feature Lab proposals must be evidence-backed and remain advisory until #16 admits implementation through the anti-dup/workstream gate. Track lifecycle `DISCOVERY -> PROPOSED -> ADMITTED / REJECTED / DEFERRED -> IMPLEMENTING -> VERIFIED`; do not create implementation Issues merely because a proposal exists.
+- UX / UI Optimization Lab uses real rendered browser-agent evidence and baseline/budget comparison for meaningful UI changes. Source/static inspection alone does not establish UX acceptance.
+- Canonical #59 / `v0.3/autonomy-ops` owns lab governance, proposal/UX findings, GitHub-side baselines/budgets, sanitized Pages projection/UI, and resume-loop persistence.
+- Canonical #62 / `v0.3/browser-e2e-executor` is the single admitted independent browser-agent rendered-journey executor lane. Its private relay/Supabase transport is executor-only and never canonical bulletin-board state.
+- Proposal/executor authors do not self-approve downstream implementation. Exact implementation heads still require a different logical AI review through #19.
+- If no evidence-backed proposal, measured UX finding, admitted work, or actionable regression exists, do not generate work to keep a department busy.
+
 ## 4. CLAIM gate
 
 Before implementation:
