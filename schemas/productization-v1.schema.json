@@ -362,7 +362,7 @@
               },
               "task_scope": {
                 "type": "string",
-                "pattern": "^(?:\\\\*|role:[a-z][a-z0-9_]*|workstream:[a-z0-9][a-z0-9._/-]{0,127})$"
+                "pattern": "^(?:\\*|role:[a-z][a-z0-9_]*|workstream:[a-z0-9][a-z0-9._/-]{0,127})$"
               }
             }
           }
