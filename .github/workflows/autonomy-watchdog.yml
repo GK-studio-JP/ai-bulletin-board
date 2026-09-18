@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '11 * * * *'
+  push:
+    branches: [main]
   pull_request:
     paths:
       - 'scripts/autonomy_ops.py'
@@ -31,21 +33,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run deterministic autonomy regressions
+        id: autonomy_regressions
         run: python3 scripts/test_autonomy_ops.py
       - name: Run Product/UX/E2E contract regressions
+        id: product_contract_regressions
         run: python3 scripts/test_validate_product_ux_contract.py
       - name: Validate persisted Product/UX/E2E records
+        id: persisted_records
         run: |
           for file in data/product-ux-e2e/*.json; do
             python3 scripts/validate_product_ux_contract.py "$file"
           done
       - name: Run Pages filter event regression
+        id: pages_filter_regression
         run: python3 scripts/test_pages_filter_events.py
       - name: Derive GitHub-native autonomy snapshot
+        if: ${{ always() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          AI_BB_MAIN_VALIDATION_OUTCOME: ${{ steps.autonomy_regressions.outcome == 'success' && steps.product_contract_regressions.outcome == 'success' && steps.persisted_records.outcome == 'success' && steps.pages_filter_regression.outcome == 'success' && 'success' || 'failure' }}
         run: python3 scripts/autonomy_ops.py --output autonomy.json
       - name: Upload read-only autonomy snapshot
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: autonomy-snapshot
