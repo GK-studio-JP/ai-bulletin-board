@@ -52,4 +52,62 @@ assert m.main_check_state([
     {"status": "completed", "conclusion": "skipped"},
 ]) == "MAIN_GREEN"
 
+
+
+def proto_event(typ, agent, task, key, artifacts, next_action="work", summary="event"):
+    import json
+    payload = {
+        "type": typ, "agent_id": agent, "task": task, "idempotency_key": key,
+        "summary": summary, "next_action": None if typ == "RESULT" else next_action,
+        "artifacts": artifacts,
+    }
+    return "<!-- ai-bb:v1 -->\n\`\`\`json\n" + json.dumps(payload) + "\n\`\`\`"
+
+
+def comment(cid, when, body, updated=None):
+    return {"id": cid, "created_at": when, "updated_at": updated or when, "body": body}
+
+
+HEAD1 = "PR:#61@abcdef1"
+HEAD2 = "PR:#61@abcdef2"
+base_comments = [
+    comment(1, "2026-09-18T00:00:00Z", proto_event("CLAIM", "author", "#59", "claim", [])),
+    comment(2, "2026-09-18T00:00:01Z", proto_event("PROGRESS", "author", "#59", "produce-h1", [HEAD1])),
+]
+
+# Producer self-review is not independent evidence.
+comments = base_comments + [
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "author", "#59", "self-review", [HEAD1])),
+]
+assert m.review_evidence(comments, HEAD1, 59) == (0, 0)
+
+# Malformed and task-mismatched REVIEW payloads do not count.
+malformed = "<!-- ai-bb:v1 -->\n\`\`\`json\n{\"type\":\"REVIEW\",\"agent_id\":\"reviewer\",\"task\":\"#59\",\"artifacts\":[\"PR:#61@abcdef1\"]}\n\`\`\`"
+comments = base_comments + [
+    comment(3, "2026-09-18T00:00:02Z", malformed),
+    comment(4, "2026-09-18T00:00:03Z", proto_event("REVIEW", "reviewer", "#60", "wrong-task", [HEAD1])),
+]
+assert m.review_evidence(comments, HEAD1, 59) == (0, 0)
+
+# Any edited marker-bearing protocol comment fails review evidence closed.
+comments = base_comments + [
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "reviewer", "#59", "edited-review", [HEAD1]),
+            updated="2026-09-18T00:00:03Z"),
+]
+assert m.review_evidence(comments, HEAD1, 59) == (0, 0)
+
+# Two genuine different logical reviewers on the exact produced head are a storm signal input.
+comments = base_comments + [
+    comment(3, "2026-09-18T00:00:02Z", proto_event("REVIEW", "reviewer-a", "#59", "review-a", [HEAD1])),
+    comment(4, "2026-09-18T00:00:03Z", proto_event("REVIEW", "reviewer-b", "#59", "review-b", [HEAD1])),
+]
+assert m.review_evidence(comments, HEAD1, 59) == (2, 0)
+
+# Stale-head independent review stays stale and never covers the current produced head.
+comments = base_comments + [
+    comment(3, "2026-09-18T00:00:02Z", proto_event("PROGRESS", "author", "#59", "produce-h2", [HEAD2])),
+    comment(4, "2026-09-18T00:00:03Z", proto_event("REVIEW", "reviewer", "#59", "stale-review", [HEAD1])),
+]
+assert m.review_evidence(comments, HEAD2, 59) == (0, 1)
+
 print("autonomy_ops regressions: ok")
