@@ -213,3 +213,14 @@ bad["raw_page_text"] = "private payload"
 must_fail(bad, "unknown fields")
 
 print("Product/UX/E2E contract regressions passed")
+
+
+# Keep Productization Phase-0 validation inside the existing tokenless PR CI gate.
+# This is validation-only: it does not change runtime, scheduler, or workflow behavior.
+import runpy
+from pathlib import Path
+
+runpy.run_path(
+    str(Path(__file__).with_name("test_validate_productization_contract.py")),
+    run_name="__main__",
+)

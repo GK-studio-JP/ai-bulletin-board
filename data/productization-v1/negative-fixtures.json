@@ -1,0 +1,300 @@
+[
+  {
+    "name": "fixed-issue-role-key",
+    "contains": "role identity must be symbolic",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "installation_state",
+          "roles"
+        ],
+        "value": {
+          "#16": 101,
+          "review_manager": 102
+        }
+      }
+    ]
+  },
+  {
+    "name": "unmapped-state-effect-principal",
+    "contains": "unmapped principal cannot affect state",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "authorization_policy",
+          "state_effect_grants"
+        ],
+        "value": [
+          {
+            "principal_id": "user.unknown",
+            "capability": "claim",
+            "task_scope": "*"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "mutable-action-reference",
+    "contains": "immutable 40-hex commit SHA",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "release_manifest",
+          "actions",
+          0,
+          "uses"
+        ],
+        "value": "actions/checkout@v4"
+      }
+    ]
+  },
+  {
+    "name": "private-project-public-pages",
+    "contains": "private classification cannot enable public Pages",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "project_config",
+          "profile"
+        ],
+        "value": "private-no-public-console"
+      },
+      {
+        "op": "set",
+        "path": [
+          "project_config",
+          "console"
+        ],
+        "value": {
+          "mode": "public-pages",
+          "data_classification": "private",
+          "public_opt_in": true
+        }
+      },
+      {
+        "op": "set",
+        "path": [
+          "release_manifest",
+          "supported_profile"
+        ],
+        "value": "private-no-public-console"
+      }
+    ]
+  },
+  {
+    "name": "public-issue-browser-transport",
+    "contains": "public Issue browser transport is unsupported",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "project_config",
+          "browser"
+        ],
+        "value": {
+          "enabled": true,
+          "transport": "public-issue"
+        }
+      }
+    ]
+  },
+  {
+    "name": "incompatible-downgrade",
+    "contains": "incompatible downgrade rejected",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "compatibility",
+          "requested_downgrade"
+        ],
+        "value": {
+          "target_version": "0.9.0",
+          "target_supported_persisted_schema_versions": [
+            "ai-bb-productization:v1"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "missing-installation-id",
+    "contains": "missing required fields",
+    "ops": [
+      {
+        "op": "delete",
+        "path": [
+          "installation_state",
+          "installation_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "duplicate-role-binding",
+    "contains": "duplicate Issue binding",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "installation_state",
+          "roles",
+          "product_ux"
+        ],
+        "value": 101
+      }
+    ]
+  },
+  {
+    "name": "release-component-missing-digest",
+    "contains": "missing required fields",
+    "ops": [
+      {
+        "op": "delete",
+        "path": [
+          "release_manifest",
+          "components",
+          "core",
+          "digest"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "evidence-artifact-missing-digest",
+    "contains": "missing required fields",
+    "ops": [
+      {
+        "op": "delete",
+        "path": [
+          "evidence_manifest",
+          "artifacts",
+          0,
+          "digest"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "credential-like-secret-material",
+    "contains": "credential-like secret material is forbidden",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "installation_state",
+          "resources",
+          0,
+          "owner_marker"
+        ],
+        "value": "github_pat_example_should_never_be_persisted"
+      }
+    ]
+  },
+  {
+    "name": "missing-resource-map",
+    "contains": "at least one managed resource",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "installation_state",
+          "resources"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "release-missing-core-workflows-identities",
+    "contains": "must include core and workflows components",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "release_manifest",
+          "components"
+        ],
+        "value": {
+          "module_a": {
+            "repository": "example/ai-bulletin-board-core",
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "module_b": {
+            "repository": "example/ai-bulletin-board-core",
+            "commit_sha": "2222222222222222222222222222222222222222",
+            "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "missing-required-evidence-class",
+    "contains": "missing required evidence classes",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "evidence_manifest",
+          "artifacts"
+        ],
+        "value": [
+          {
+            "class": "acceptance_results",
+            "name": "acceptance-results",
+            "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "durable": true,
+            "provenance_ref": "release:ai-bb-v1.0.0-rc1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "mapped-principal-capability-mismatch",
+    "contains": "principal lacks capability",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "authorization_policy",
+          "state_effect_grants"
+        ],
+        "value": [
+          {
+            "principal_id": "team.integrators",
+            "capability": "claim",
+            "task_scope": "role:manager"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "fixed-issue-task-scope",
+    "contains": "task scope must be symbolic",
+    "ops": [
+      {
+        "op": "set",
+        "path": [
+          "authorization_policy",
+          "state_effect_grants"
+        ],
+        "value": [
+          {
+            "principal_id": "app.control-plane",
+            "capability": "claim",
+            "task_scope": "#16"
+          }
+        ]
+      }
+    ]
+  }
+]
