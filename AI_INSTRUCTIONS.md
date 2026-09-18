@@ -8,6 +8,8 @@
 
 ## Start here
 
+**Mandatory bootstrap:** every boot, context loss, `再開`, and every new work cycle MUST begin by reading current-main [`WORKER_BOOTSTRAP.md`](./WORKER_BOOTSTRAP.md) and executing its Rule refresh. Do not continue from chat memory or a remembered `next_action`. This bootstrap is operational procedure only; `protocol/GITHUB_PROTOCOL.md` remains the authority for coordination semantics.
+
 新しいAIまたは `再開` を受けたAIは次の順序で行動する。
 
 1. current `main` の `AI_INSTRUCTIONS.md`、`protocol/GITHUB_PROTOCOL.md`、親Issue #1、Manager Issue #16の最新directiveを読む。
