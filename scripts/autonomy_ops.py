@@ -185,6 +185,14 @@ def review_queue_entry(row, comments, exact_head_sha):
     }
 
 
+def reconcile_task_review(row, entry):
+    """Apply exact current-PR review state before scheduler classification."""
+    if not entry:
+        return
+    row["current_head"] = entry["head"]
+    row["review_needed"] = bool(entry["review_needed"])
+
+
 def classify_task(row, main_status):
     state = row.get("state") or "open"
     next_action = row.get("next_action") or ""
@@ -270,6 +278,7 @@ def collect(repo: str):
         exact_head_sha = api(f"{root}/pulls/{pr_number}").get("head", {}).get("sha", "")
         entry = review_queue_entry(row, comments_by_issue[issue_number], exact_head_sha)
         if entry:
+            reconcile_task_review(row, entry)
             review_meta.append(entry)
     review_meta = [{k: x[k] for k in SAFE_REVIEW_FIELDS} for x in review_meta]
 
