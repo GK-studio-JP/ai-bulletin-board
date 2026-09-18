@@ -97,7 +97,7 @@ Budgets are not allowed until measured baseline evidence exists. Any non-null `b
 - `rationale`: non-empty evidence-based rationale
 - `thresholds`: non-empty map of metric names to numeric/boolean thresholds
 
-The validator performs collection-level reference resolution. `improved`, `regressed`, and `unchanged` results must resolve `baseline_ref` to an included measured `comparison: "baseline"` result for the same journey, executor schema, and exact viewport; `uncompared` and baseline results must not claim a prior baseline. Any non-null budget must resolve to that same measured baseline and include evidence-based rationale. A matching string alone is insufficient. This prevents arbitrary or nonexistent baseline refs from silently turning thresholds into gates.
+The validator performs collection-level reference resolution. Every `measured_at` must be a timezone-qualified ISO-8601 date-time. `improved`, `regressed`, and `unchanged` results must resolve `baseline_ref` to an included measured `comparison: "baseline"` result for the same journey, executor schema, and exact viewport, and that baseline's `measured_at` must be strictly earlier than the compared result. `uncompared` and baseline results must not claim a prior baseline. Any non-null budget must resolve to that same prior measured baseline and include evidence-based rationale. A matching string alone is insufficient. This prevents arbitrary, nonexistent, same-time, or future baseline refs from silently turning thresholds into gates.
 
 ## Projection safety
 
