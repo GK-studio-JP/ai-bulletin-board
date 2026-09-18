@@ -204,6 +204,12 @@ Canonical #59 / `v0.3/autonomy-ops` owns Product/Feature Lab governance, UX find
 
 On every resume cycle, after higher-priority security/main-red/live-claim/review work, inspect these standing queues through current GitHub-native state: evidence-backed proposals/findings, admitted implementation, latest E2E/baseline status, regression/budget signals, visual-acceptance status, and executable blocker/owner/next_action. Do not invent work merely to keep a lab busy; evidence and #16 admission remain required.
 
+## Standing Continuous Product/UX Gap Finder
+
+Canonical #97 / `autonomy/continuous-gap-finder` is the standing discovery/orphan watchdog. On every resume after higher-priority safety/main/live-claim/review/integration work, and after material main/Pages/E2E/proposal/workstream/PR/safety/freshness transitions, run a GAP_SCAN over fresh current-main Product/UX/E2E/acceptance evidence.
+
+Every unresolved finding must have evidence, journey/state, descriptive impact, freshness, duplicate/workstream check, executable next action, and exactly one disposition: live equivalent; proposal through #16; authority-backed DEFERRED/REJECTED; or Human Required. Stale/closed/deferred/diverged PRs are not live dispositions, and green CI/E2E does not erase accepted usability friction. Emit freshness and operator-report receipts even when no gap is found. This role does not self-admit implementation, self-review, merge, or mutate another owned lane.
+
 ## Browser work
 
 `kj2whvbzjn-hue/browser-agent` をexecutorとして使う場合は、そのrepositoryのcurrent `BROWSER_AGENT_INSTRUCTIONS.md` を読む。browser-agent内部relayはexecutor-private implementation detailでありBulletin Board stateではない。generation-bound element IDをhandoffで再利用せず、resume時は再観測する。login/CAPTCHA/本人確認等は必要に応じ人間へtakeoverする。
