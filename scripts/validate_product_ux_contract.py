@@ -52,6 +52,25 @@ FIELDS = {
     "e2e_result": {"schema_version","kind","journey_id","executor_schema","measured_at",
         "viewport","metrics","artifact_ref","baseline_ref","comparison","budgets","next_action"},
 }
+REQUIRED_FIELDS = {
+    "product_proposal": {
+        "schema_version","kind","proposal_id","lifecycle","problem","evidence_refs",
+        "expected_user_value","affected_surfaces","dependencies","security_privacy_constraints",
+        "acceptance_tests","size_risk","owner","next_action",
+    },
+    "ux_finding": {
+        "schema_version","kind","finding_id","lifecycle","evidence_refs","surfaces","friction",
+        "hypothesis","acceptance_tests","owner","next_action",
+    },
+    "journey_definition": {
+        "schema_version","kind","journey_id","steps","expected_destination","required_viewports",
+        "required_metrics","evidence_refs","next_action",
+    },
+    "e2e_result": {
+        "schema_version","kind","journey_id","executor_schema","measured_at","viewport","metrics",
+        "artifact_ref","baseline_ref","comparison","budgets","next_action",
+    },
+}
 
 class ContractError(ValueError):
     pass
@@ -78,12 +97,17 @@ def _strict_fields(record, allowed):
     extra = set(record) - allowed
     _require(not extra, f"unknown fields: {sorted(extra)}")
 
+def _required_fields(record, required):
+    missing = required - set(record)
+    _require(not missing, f"missing required fields: {sorted(missing)}")
+
 def validate_record(record):
     _require(isinstance(record, dict), "record must be an object")
     _require(record.get("schema_version") == SCHEMA_VERSION, "unsupported schema_version")
     kind = record.get("kind")
     _require(kind in FIELDS, "unsupported kind")
     _strict_fields(record, FIELDS[kind])
+    _required_fields(record, REQUIRED_FIELDS[kind])
 
     if "next_action" in record:
         _require(record["next_action"] is None or isinstance(record["next_action"], str),
@@ -164,11 +188,20 @@ def validate_record(record):
         baseline_ref = record.get("baseline_ref")
         _require(baseline_ref is None or (isinstance(baseline_ref, str) and baseline_ref.strip()),
                  "baseline_ref must be non-empty string or null")
+        if comparison == "baseline":
+            _require(baseline_ref is None, "baseline comparison must not point to a prior baseline")
+        elif comparison in {"improved","regressed","unchanged"}:
+            _require(isinstance(baseline_ref, str) and baseline_ref.strip(),
+                     f"{comparison} comparison requires baseline_ref")
+        elif comparison == "uncompared":
+            _require(baseline_ref is None, "uncompared result must not claim baseline_ref")
+
         budgets = record.get("budgets")
         if budgets is None:
-            _require(not (comparison == "baseline" and baseline_ref is not None),
-                     "baseline comparison must not point to a prior baseline")
+            pass
         else:
+            _require(comparison not in {"baseline","uncompared"},
+                     "budgets require a compared result with measured baseline")
             _require(isinstance(budgets, dict) and set(budgets) == {"baseline_ref","rationale","thresholds"},
                      "budgets fields must be baseline_ref,rationale,thresholds")
             _nonempty_str(budgets.get("baseline_ref"), "budgets.baseline_ref")
@@ -186,14 +219,44 @@ def validate_record(record):
                              f"budget {key} must be non-negative numeric")
     return record
 
+def validate_records(records):
+    _require(isinstance(records, list) and records, "records must be a non-empty list")
+    for record in records:
+        validate_record(record)
+
+    results = [record for record in records if record.get("kind") == "e2e_result"]
+    by_artifact = {}
+    for result in results:
+        ref = result["artifact_ref"]
+        _require(ref not in by_artifact, f"duplicate e2e artifact_ref: {ref}")
+        by_artifact[ref] = result
+
+    for result in results:
+        baseline_ref = result["baseline_ref"]
+        if baseline_ref is None:
+            continue
+        baseline = by_artifact.get(baseline_ref)
+        _require(baseline is not None, f"baseline_ref does not resolve to measured result: {baseline_ref}")
+        _require(baseline["comparison"] == "baseline" and baseline["baseline_ref"] is None,
+                 "baseline_ref must resolve to a baseline result")
+        _require(baseline["journey_id"] == result["journey_id"],
+                 "baseline_ref must resolve to the same journey_id")
+        _require(baseline["executor_schema"] == result["executor_schema"],
+                 "baseline_ref must resolve to the same executor_schema")
+        _require(baseline["viewport"] == result["viewport"],
+                 "baseline_ref must resolve to the same viewport")
+        if result["budgets"] is not None:
+            _require(result["budgets"]["baseline_ref"] == baseline["artifact_ref"],
+                     "budgets must resolve to the measured baseline result")
+    return records
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("path")
     args = parser.parse_args()
     data = json.loads(Path(args.path).read_text())
     records = data if isinstance(data, list) else [data]
-    for record in records:
-        validate_record(record)
+    validate_records(records)
     print(f"validated {len(records)} record(s) against {SCHEMA_VERSION}")
 
 if __name__ == "__main__":
