@@ -52,6 +52,19 @@ assert m.main_check_state([
     {"status": "completed", "conclusion": "skipped"},
 ]) == "MAIN_GREEN"
 
+# Current-main watchdog runs can deterministically self-report the validated
+# default-branch SHA after preceding validation steps finish. PR/other SHAs
+# must fall back to actual watchdog check evidence instead.
+assert m.current_main_state("mainsha", [], "mainsha", "success") == "MAIN_GREEN"
+assert m.current_main_state("mainsha", [], "mainsha", "failure") == "MAIN_RED"
+assert m.current_main_state("mainsha", [], "othersha", "success") == "MAIN_UNKNOWN"
+assert m.current_main_state(
+    "mainsha",
+    [{"status": "completed", "conclusion": "success"}],
+    "othersha",
+    "success",
+) == "MAIN_GREEN"
+
 
 
 def proto_event(typ, agent, task, key, artifacts, next_action="work", summary="event"):
