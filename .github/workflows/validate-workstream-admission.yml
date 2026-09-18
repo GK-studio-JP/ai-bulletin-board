@@ -1,0 +1,22 @@
+name: Validate workstream admission
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  workstream-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate workstream admission
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/validate_workstream_admission.py --event "$GITHUB_EVENT_PATH"
+      - name: Run deterministic admission regressions
+        run: python3 scripts/test_validate_workstream_admission.py
