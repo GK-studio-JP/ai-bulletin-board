@@ -110,6 +110,8 @@ Pages is a read-only sanitized projection. Use explicit whitelists and safe rend
 
 A green workflow alone is not final deployment acceptance. Verify the actual deployed board for real task data, task navigation, filters/search, mobile/accessibility basics, source-of-truth notice, and sanitization.
 
+Rendered-screen verification is mandatory for Pages releases and meaningful UI changes. Use browser-agent against the real deployed URL and visually inspect desktop plus a mobile/narrow viewport for layout breakage, overlap/clipping, unreadable text, broken spacing/alignment, empty/error states, and obvious responsive defects; exercise core controls/navigation in the rendered UI. Static source/DOM/artifact inspection does not substitute for this check. If the current executor cannot change viewport size, record that limitation and use a capable browser verification lane before declaring visual acceptance. Record concrete rendered evidence/blockers on the canonical Issue, fix defects in the same workstream, redeploy, repeat browser verification, and end the browser session after evidence capture.
+
 ## 9. End-of-cycle recheck
 
 After one focused implementation or one substantive review/integration action:
