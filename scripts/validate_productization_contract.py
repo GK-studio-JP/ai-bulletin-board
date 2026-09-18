@@ -22,6 +22,7 @@ REPO_REF_RE = re.compile(r"^[^/]+/[^@]+@[0-9a-f]{40}$")
 ROLE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 INSTALLATION_RE = re.compile(r"^aibb-[a-z0-9][a-z0-9-]{7,63}$")
 SECRET_REF_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,127}$")
+TASK_SCOPE_RE = re.compile(r"^(?:\\*|role:[a-z][a-z0-9_]*|workstream:[a-z0-9][a-z0-9._/-]{0,127})$")
 
 LIFECYCLE_STATES = {
     "PLANNED", "PREFLIGHT", "INSTALLING", "ACTIVE", "UPGRADING",
@@ -49,6 +50,11 @@ REQUIRED_HUMAN_GATES = {
 REQUIRED_ACCESSIBILITY = {
     "keyboard", "screen_reader", "color_independent", "visible_focus_errors",
     "long_text", "narrow_mobile_priority",
+}
+REQUIRED_EVIDENCE_CLASSES = {
+    "acceptance_results", "sanitized_e2e_product_ux", "security_privacy_sanitizer",
+    "permission_ruleset_environment", "provenance_sbom", "audit_logs_findings",
+    "emergency_disable_revoke",
 }
 
 SECRET_KEY_NAMES = {
@@ -240,6 +246,8 @@ def validate_installation_state(obj: dict) -> None:
         fail(f"{path}.roles", "duplicate Issue binding across symbolic roles")
 
     resources = require_list(obj["resources"], f"{path}.resources")
+    if not resources:
+        fail(f"{path}.resources", "at least one managed resource is required")
     seen_resources = set()
     for i, resource in enumerate(resources):
         rp = f"{path}.resources[{i}]"
@@ -268,23 +276,22 @@ def validate_authorization_policy(obj: dict) -> None:
     path = "$.authorization_policy"
     strict_keys(
         obj,
-        {"agent_id_is_authentication", "principals", "state_effect_principals"},
-        {"agent_id_is_authentication", "principals", "state_effect_principals"},
+        {"agent_id_is_authentication", "principals", "state_effect_grants"},
+        {"agent_id_is_authentication", "principals", "state_effect_grants"},
         path,
     )
     require_bool(obj["agent_id_is_authentication"], False, f"{path}.agent_id_is_authentication")
 
     principals = require_list(obj["principals"], f"{path}.principals")
-    principal_ids = set()
+    principal_caps = {}
     for i, principal in enumerate(principals):
         pp = f"{path}.principals[{i}]"
         strict_keys(principal, {"principal_id", "github_kind", "github_id", "capabilities"}, {"principal_id", "github_kind", "github_id", "capabilities"}, pp)
         principal_id = require_nonempty_str(principal["principal_id"], f"{pp}.principal_id")
         if not re.match(r"^[a-z][a-z0-9._/-]{2,127}$", principal_id):
             fail(f"{pp}.principal_id", "invalid principal_id")
-        if principal_id in principal_ids:
+        if principal_id in principal_caps:
             fail(f"{pp}.principal_id", "duplicate principal_id")
-        principal_ids.add(principal_id)
         if principal["github_kind"] not in {"app", "user", "team"}:
             fail(f"{pp}.github_kind", "unsupported GitHub principal kind")
         require_int(principal["github_id"], f"{pp}.github_id")
@@ -292,11 +299,30 @@ def validate_authorization_policy(obj: dict) -> None:
         unknown_caps = sorted(set(caps) - CAPABILITIES)
         if unknown_caps:
             fail(f"{pp}.capabilities", f"unknown capabilities {unknown_caps}")
+        principal_caps[principal_id] = set(caps)
 
-    state_effect = unique_strings(require_list(obj["state_effect_principals"], f"{path}.state_effect_principals"), f"{path}.state_effect_principals")
-    unmapped = sorted(set(state_effect) - principal_ids)
-    if unmapped:
-        fail(f"{path}.state_effect_principals", f"unmapped principals cannot affect state: {unmapped}")
+    grants = require_list(obj["state_effect_grants"], f"{path}.state_effect_grants")
+    if not grants:
+        fail(f"{path}.state_effect_grants", "at least one state-effect grant is required")
+    seen = set()
+    for i, grant in enumerate(grants):
+        gp = f"{path}.state_effect_grants[{i}]"
+        strict_keys(grant, {"principal_id", "capability", "task_scope"}, {"principal_id", "capability", "task_scope"}, gp)
+        principal_id = require_nonempty_str(grant["principal_id"], f"{gp}.principal_id")
+        if principal_id not in principal_caps:
+            fail(f"{gp}.principal_id", f"unmapped principal cannot affect state: {principal_id}")
+        capability = require_nonempty_str(grant["capability"], f"{gp}.capability")
+        if capability not in CAPABILITIES:
+            fail(f"{gp}.capability", f"unknown capability {capability}")
+        if capability not in principal_caps[principal_id]:
+            fail(f"{gp}.capability", f"principal lacks capability {capability}")
+        task_scope = require_nonempty_str(grant["task_scope"], f"{gp}.task_scope")
+        if not TASK_SCOPE_RE.match(task_scope):
+            fail(f"{gp}.task_scope", "task scope must be symbolic (*, role:<name>, or workstream:<key>)")
+        key = (principal_id, capability, task_scope)
+        if key in seen:
+            fail(gp, "duplicate state-effect grant")
+        seen.add(key)
 
 
 def validate_release_manifest(obj: dict) -> None:
@@ -312,7 +338,10 @@ def validate_release_manifest(obj: dict) -> None:
         fail(f"{path}.supported_profile", "unsupported release profile")
     components = require_type(obj["components"], dict, f"{path}.components")
     if len(components) < 2:
-        fail(f"{path}.components", "release must identify at least core and workflow components")
+        fail(f"{path}.components", "release must identify at least core and workflows components")
+    missing_required_components = [name for name in ("core", "workflows") if name not in components]
+    if missing_required_components:
+        fail(f"{path}.components", "must include core and workflows components")
     for name, component in components.items():
         cp = f"{path}.components.{name}"
         if not ROLE_RE.match(name):
@@ -354,14 +383,27 @@ def validate_evidence_manifest(obj: dict) -> None:
     artifacts = require_list(obj["artifacts"], f"{path}.artifacts")
     if not artifacts:
         fail(f"{path}.artifacts", "durable release evidence is required")
+    seen_classes = set()
     for i, artifact in enumerate(artifacts):
         ap = f"{path}.artifacts[{i}]"
-        strict_keys(artifact, {"name", "digest", "durable", "provenance_ref"}, {"name", "digest", "durable", "provenance_ref"}, ap)
+        strict_keys(
+            artifact,
+            {"class", "name", "digest", "durable", "provenance_ref"},
+            {"class", "name", "digest", "durable", "provenance_ref"},
+            ap,
+        )
+        evidence_class = require_nonempty_str(artifact["class"], f"{ap}.class")
+        if evidence_class not in REQUIRED_EVIDENCE_CLASSES:
+            fail(f"{ap}.class", f"unsupported evidence class {evidence_class}")
+        seen_classes.add(evidence_class)
         require_nonempty_str(artifact["name"], f"{ap}.name")
         if not isinstance(artifact["digest"], str) or not DIGEST_RE.match(artifact["digest"]):
             fail(f"{ap}.digest", "sha256 evidence digest required")
         require_bool(artifact["durable"], True, f"{ap}.durable")
         require_nonempty_str(artifact["provenance_ref"], f"{ap}.provenance_ref")
+    missing_classes = sorted(REQUIRED_EVIDENCE_CLASSES - seen_classes)
+    if missing_classes:
+        fail(f"{path}.artifacts", f"missing required evidence classes {missing_classes}")
     require_bool(obj["actions_retention_independent"], True, f"{path}.actions_retention_independent")
 
 
