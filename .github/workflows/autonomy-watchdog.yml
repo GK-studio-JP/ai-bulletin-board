@@ -1,0 +1,39 @@
+name: Autonomy watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '11 * * * *'
+  pull_request:
+    paths:
+      - 'scripts/autonomy_ops.py'
+      - 'scripts/test_autonomy_ops.py'
+      - '.github/workflows/autonomy-watchdog.yml'
+      - 'WORKER_BOOTSTRAP.md'
+      - 'AI_INSTRUCTIONS.md'
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run deterministic autonomy regressions
+        run: python3 scripts/test_autonomy_ops.py
+      - name: Derive GitHub-native autonomy snapshot
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/autonomy_ops.py --output autonomy.json
+      - name: Upload read-only autonomy snapshot
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: autonomy-snapshot
+          path: autonomy.json
+          if-no-files-found: error
