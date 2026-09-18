@@ -39,7 +39,7 @@ Required fields:
 - `owner`: logical owner or queue name
 - `next_action`: executable next action or `null`
 
-`ADMITTED`, `IMPLEMENTING`, and `VERIFIED` records additionally require `workstream_ref`. Earlier advisory states must not claim an implementation workstream.
+`owner` and `next_action` are required keys for every Product proposal record (`next_action` may be `null` only when intentionally terminal). `ADMITTED`, `IMPLEMENTING`, and `VERIFIED` records additionally require `workstream_ref`. Earlier advisory states must not claim an implementation workstream.
 
 ## UX finding / experiment record
 
@@ -56,7 +56,7 @@ Required fields:
 - `owner`
 - `next_action`
 
-Meaningful UI changes do not become `VERIFIED` without a `rendered_e2e_ref` pointing to real deployed desktop+narrow evidence.
+`owner` and `next_action` are required keys for every UX finding record (`next_action` may be `null` only when intentionally terminal). Meaningful UI changes do not become `VERIFIED` without a `rendered_e2e_ref` pointing to real deployed desktop+narrow evidence.
 
 ## Canonical journey definition
 
@@ -97,7 +97,7 @@ Budgets are not allowed until measured baseline evidence exists. Any non-null `b
 - `rationale`: non-empty evidence-based rationale
 - `thresholds`: non-empty map of metric names to numeric/boolean thresholds
 
-The validator rejects budget thresholds without baseline evidence/rationale. This prevents arbitrary numbers from silently becoming gates.
+The validator performs collection-level reference resolution. `improved`, `regressed`, and `unchanged` results must resolve `baseline_ref` to an included measured `comparison: "baseline"` result for the same journey, executor schema, and exact viewport; `uncompared` and baseline results must not claim a prior baseline. Any non-null budget must resolve to that same measured baseline and include evidence-based rationale. A matching string alone is insufficient. This prevents arbitrary or nonexistent baseline refs from silently turning thresholds into gates.
 
 ## Projection safety
 
