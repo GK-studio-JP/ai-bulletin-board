@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import copy
-from validate_product_ux_contract import ContractError, REQUIRED_METRICS, validate_record
+from validate_product_ux_contract import (
+    ContractError,
+    REQUIRED_METRICS,
+    validate_record,
+    validate_records,
+)
 
 SCHEMA = "ai-bb-product-ux-e2e:v1"
 
@@ -11,6 +16,14 @@ def must_fail(record, contains):
         assert contains in str(exc), (contains, str(exc))
     else:
         raise AssertionError(f"expected failure containing {contains!r}")
+
+def must_fail_records(records, contains):
+    try:
+        validate_records(records)
+    except ContractError as exc:
+        assert contains in str(exc), (contains, str(exc))
+    else:
+        raise AssertionError(f"expected collection failure containing {contains!r}")
 
 proposal = {
     "schema_version": SCHEMA,
@@ -29,6 +42,14 @@ proposal = {
     "next_action": "Request #16 admission after baseline evidence review",
 }
 validate_record(proposal)
+
+bad = copy.deepcopy(proposal)
+bad.pop("owner")
+must_fail(bad, "missing required fields")
+
+bad = copy.deepcopy(proposal)
+bad.pop("next_action")
+must_fail(bad, "missing required fields")
 
 bad = copy.deepcopy(proposal)
 bad["workstream_ref"] = "v0.3/unadmitted"
@@ -55,6 +76,14 @@ finding = {
     "next_action": None,
 }
 validate_record(finding)
+
+bad = copy.deepcopy(finding)
+bad.pop("owner")
+must_fail(bad, "missing required fields")
+
+bad = copy.deepcopy(finding)
+bad.pop("next_action")
+must_fail(bad, "missing required fields")
 
 bad = copy.deepcopy(finding)
 bad.pop("rendered_e2e_ref")
@@ -113,16 +142,20 @@ baseline = {
     "next_action": "Use measured baseline to propose justified budgets",
 }
 validate_record(baseline)
+validate_records([baseline])
 
 bad = copy.deepcopy(baseline)
-bad["budgets"] = {
-    "baseline_ref": "artifact:made-up",
-    "rationale": "arbitrary",
-    "thresholds": {"action_count": 2},
-}
-must_fail(bad, "must match result baseline_ref")
+bad["comparison"] = "improved"
+must_fail(bad, "requires baseline_ref")
+
+bad = copy.deepcopy(baseline)
+bad["comparison"] = "uncompared"
+bad["baseline_ref"] = "artifact:10500000000"
+must_fail(bad, "uncompared result")
 
 compared = copy.deepcopy(baseline)
+compared["artifact_ref"] = "artifact:10500000001"
+compared["measured_at"] = "2026-09-18T02:00:00Z"
 compared["baseline_ref"] = "artifact:10500000000"
 compared["comparison"] = "unchanged"
 compared["budgets"] = {
@@ -136,6 +169,28 @@ compared["budgets"] = {
     },
 }
 validate_record(compared)
+validate_records([baseline, compared])
+
+bad = copy.deepcopy(compared)
+bad["baseline_ref"] = "artifact:does-not-exist"
+bad["budgets"]["baseline_ref"] = "artifact:does-not-exist"
+must_fail_records([baseline, bad], "does not resolve to measured result")
+
+wrong_journey_baseline = copy.deepcopy(baseline)
+wrong_journey_baseline["artifact_ref"] = "artifact:wrong-journey"
+wrong_journey_baseline["journey_id"] = "board/other-journey"
+bad = copy.deepcopy(compared)
+bad["baseline_ref"] = "artifact:wrong-journey"
+bad["budgets"]["baseline_ref"] = "artifact:wrong-journey"
+must_fail_records([wrong_journey_baseline, bad], "same journey_id")
+
+wrong_viewport_baseline = copy.deepcopy(baseline)
+wrong_viewport_baseline["artifact_ref"] = "artifact:wrong-viewport"
+wrong_viewport_baseline["viewport"] = {"class":"desktop","width":1440,"height":900}
+bad = copy.deepcopy(compared)
+bad["baseline_ref"] = "artifact:wrong-viewport"
+bad["budgets"]["baseline_ref"] = "artifact:wrong-viewport"
+must_fail_records([wrong_viewport_baseline, bad], "same viewport")
 
 bad = copy.deepcopy(compared)
 bad["raw_page_text"] = "private payload"
