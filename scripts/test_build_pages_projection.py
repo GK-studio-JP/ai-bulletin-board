@@ -89,6 +89,70 @@ assert row["review_needed"] is False
 assert row["current_head"] == "PR:#53@97e0d877"
 assert row["last_activity_at"] == iso(T0 + timedelta(seconds=1))
 
+# Stale lease evidence survives later non-ownership activity after expiry.
+stale_claim = event("CLAIM", "lease-owner", "lease-1")
+stale_review = event("REVIEW", "reviewer", "lease-2")
+state, owner, last = m.replay(
+    issue,
+    [comment(20, 0, stale_claim), comment(21, 901, stale_review)],
+    T0 + timedelta(seconds=902),
+)
+row = m.project_row({"number": 1, "title": "Lease task"}, state, owner, last)
+assert (state, owner) == ("open", None)
+assert row["lease_expires_at"] == iso(T0 + timedelta(seconds=900))
+assert row["lease_status"] == "stale"
+
+# Review coverage is exact-head and must come from a different logical agent.
+head1 = "PR:#53@1111111"
+head2 = "PR:#53@2222222"
+produced1 = event("PROGRESS", "author", "head-1")
+produced1["artifacts"] = [head1]
+produced2 = event("PROGRESS", "author", "head-2")
+produced2["artifacts"] = [head2]
+stale_review = event("REVIEW", "reviewer", "head-review-old")
+stale_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(30, 0, produced1), comment(31, 1, produced2), comment(32, 2, stale_review)],
+    T0 + timedelta(seconds=3),
+)
+row = m.project_row({"number": 1, "title": "Review task"}, state, owner, last)
+assert row["current_head"] == head2
+assert row["review_needed"] is True
+
+self_review = event("REVIEW", "author", "head-self-review")
+self_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(33, 0, produced1), comment(34, 1, self_review)],
+    T0 + timedelta(seconds=2),
+)
+row = m.project_row({"number": 1, "title": "Self review task"}, state, owner, last)
+assert row["review_needed"] is True
+
+# A later non-review mention by another agent must not overwrite the producing author.
+manager_mention = event("PROGRESS", "manager", "head-manager-mention")
+manager_mention["artifacts"] = [head1]
+author_review = event("REVIEW", "author", "head-author-review")
+author_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(35, 0, produced1), comment(36, 1, manager_mention), comment(37, 2, author_review)],
+    T0 + timedelta(seconds=3),
+)
+row = m.project_row({"number": 1, "title": "Author attribution task"}, state, owner, last)
+assert row["review_needed"] is True
+
+independent_review = event("REVIEW", "other-reviewer", "head-independent-review")
+independent_review["artifacts"] = [head1]
+state, owner, last = m.replay(
+    issue,
+    [comment(38, 0, produced1), comment(39, 1, manager_mention), comment(40, 2, independent_review)],
+    T0 + timedelta(seconds=3),
+)
+row = m.project_row({"number": 1, "title": "Independent review task"}, state, owner, last)
+assert row["review_needed"] is False
+
 # Benign display strings are bounded and normalized.
 assert m.safe_text("  review   PR #53  ") == "review PR #53"
 assert len(m.safe_text("x" * 500)) == 280
