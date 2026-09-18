@@ -25,6 +25,8 @@ on:
       - 'scripts/test_productization_phase1.py'
       - 'scripts/gap_scan.py'
       - 'scripts/test_gap_scan.py'
+      - 'scripts/evidence_action_gate.py'
+      - 'scripts/test_evidence_action_gate.py'
 
 permissions:
   contents: read
@@ -41,6 +43,9 @@ jobs:
       - name: Run deterministic autonomy regressions
         id: autonomy_regressions
         run: python3 scripts/test_autonomy_ops.py
+      - name: Run evidence-to-action terminal regressions
+        id: evidence_action_regressions
+        run: python3 scripts/test_evidence_action_gate.py
       - name: Run lease recovery regressions
         id: lease_recovery_regressions
         run: python3 scripts/test_lease_recovery.py
@@ -66,7 +71,7 @@ jobs:
         if: ${{ always() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          AI_BB_MAIN_VALIDATION_OUTCOME: ${{ steps.autonomy_regressions.outcome == 'success' && steps.lease_recovery_regressions.outcome == 'success' && steps.product_contract_regressions.outcome == 'success' && steps.persisted_records.outcome == 'success' && steps.pages_filter_regression.outcome == 'success' && steps.productization_phase1_regressions.outcome == 'success' && steps.gap_scan_regressions.outcome == 'success' && 'success' || 'failure' }}
+          AI_BB_MAIN_VALIDATION_OUTCOME: ${{ steps.autonomy_regressions.outcome == 'success' && steps.evidence_action_regressions.outcome == 'success' && steps.lease_recovery_regressions.outcome == 'success' && steps.product_contract_regressions.outcome == 'success' && steps.persisted_records.outcome == 'success' && steps.pages_filter_regression.outcome == 'success' && steps.productization_phase1_regressions.outcome == 'success' && steps.gap_scan_regressions.outcome == 'success' && 'success' || 'failure' }}
         run: python3 scripts/autonomy_ops.py --output autonomy.json
       - name: Upload read-only autonomy snapshot
         if: ${{ always() }}
