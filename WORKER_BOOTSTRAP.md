@@ -2,6 +2,10 @@
 
 This document is the canonical operational bootstrap for Worker/Manager sessions. It does not redefine coordination semantics; `protocol/GITHUB_PROTOCOL.md` remains authoritative.
 
+## Coordination namespace
+
+This checkout is the `GK-studio-JP/ai-bulletin-board` code fork. Canonical Manager/review/lab/rule-governance history remains in `kj2whvbzjn-hue/ai-bulletin-board`. Resolve governance references for `kj2whvbzjn-hue/ai-bulletin-board#1`, `kj2whvbzjn-hue/ai-bulletin-board#16`, `kj2whvbzjn-hue/ai-bulletin-board#19`, `kj2whvbzjn-hue/ai-bulletin-board#59`, `kj2whvbzjn-hue/ai-bulletin-board#62`, `kj2whvbzjn-hue/ai-bulletin-board#97`, and `kj2whvbzjn-hue/ai-bulletin-board#100` against that parent repository; local fork smoke/runtime task Issues remain local and must be explicitly repository-qualified when referenced.
+
 ## Hard constraints
 
 - Human owner instructions are highest authority.
@@ -18,8 +22,8 @@ At the start of every cycle, boot, context loss, or `再開`:
 
 1. Fetch current `main` HEAD.
 2. Re-read `main:AI_INSTRUCTIONS.md` and `main:protocol/GITHUB_PROTOCOL.md` from that HEAD.
-3. Read the latest Owner/Manager directive on Issue #16.
-4. Read the latest review directive on Issue #19.
+3. Read the latest Owner/Manager directive on Issue kj2whvbzjn-hue/ai-bulletin-board#16.
+4. Read the latest review directive on Issue kj2whvbzjn-hue/ai-bulletin-board#19.
 5. Inspect current open Issues/PRs, exact PR head SHAs, checks, mergeability, reviews, and any task state you may touch.
 6. Replay canonical events from GitHub; obey `history_unsafe`, fixed lease, idempotency, RELEASE, HANDOFF, and RESULT semantics exactly.
 7. If fetched rules differ from remembered rules, fetched GitHub rules win; record the change in the next PROGRESS/REVIEW.
@@ -30,7 +34,7 @@ Never resume from a remembered `next_action` without this refresh.
 
 Before creating any Issue, search existing canonical workstreams.
 
-Do not create a new implementation Issue when the same deliverable, acceptance criteria, files/UI surface, workstream, or blocker already exists. Workers do not independently authorize implementation Issues. Propose new work on #16 or the existing canonical Issue. Only #16 may authorize a new implementation Issue.
+Do not create a new implementation Issue when the same deliverable, acceptance criteria, files/UI surface, workstream, or blocker already exists. Workers do not independently authorize implementation Issues. Propose new work on kj2whvbzjn-hue/ai-bulletin-board#16 or the existing canonical Issue. Only kj2whvbzjn-hue/ai-bulletin-board#16 may authorize a new implementation Issue.
 
 Default invariant: one stable workstream = one active canonical Issue.
 
@@ -44,10 +48,10 @@ Priority order:
 2. broken main or failed required check;
 3. your live CLAIM needing implementation/fix;
 4. another AI's current-head PR lacking substantive independent review;
-5. an integration-ready exact reviewed head when #16 has no live owner: assume the bounded TEMPORARY_INTEGRATION_MANAGER role through fresh #16 CLAIM/replay;
+5. an integration-ready exact reviewed head when kj2whvbzjn-hue/ai-bulletin-board#16 has no live owner: assume the bounded TEMPORARY_INTEGRATION_MANAGER role through fresh kj2whvbzjn-hue/ai-bulletin-board#16 CLAIM/replay;
 6. Manager-dispatched implementation;
 7. integration/rebase/tests/deployment acceptance not covered by the temporary integration fallback;
-8. otherwise post one evidence-based IDLE report to #16 and stop.
+8. otherwise post one evidence-based IDLE report to kj2whvbzjn-hue/ai-bulletin-board#16 and stop.
 
 Do not invent work or create planning Issues to appear busy.
 
@@ -55,18 +59,18 @@ Do not invent work or create planning Issues to appear busy.
 
 After higher-priority security/main-red/live-claim/current-head-review work, every resume cycle also inspects the owner-mandated standing Product / Feature Lab and UX / UI Optimization Lab queues.
 
-- Product / Feature Lab proposals must be evidence-backed and remain advisory until #16 admits implementation through the anti-dup/workstream gate. Track lifecycle `DISCOVERY -> PROPOSED -> ADMITTED / REJECTED / DEFERRED -> IMPLEMENTING -> VERIFIED`; do not create implementation Issues merely because a proposal exists.
+- Product / Feature Lab proposals must be evidence-backed and remain advisory until kj2whvbzjn-hue/ai-bulletin-board#16 admits implementation through the anti-dup/workstream gate. Track lifecycle `DISCOVERY -> PROPOSED -> ADMITTED / REJECTED / DEFERRED -> IMPLEMENTING -> VERIFIED`; do not create implementation Issues merely because a proposal exists.
 - UX / UI Optimization Lab uses real rendered browser-agent evidence and baseline/budget comparison for meaningful UI changes. Source/static inspection alone does not establish UX acceptance.
-- Canonical #59 / `v0.3/autonomy-ops` owns lab governance, proposal/UX findings, GitHub-side baselines/budgets, sanitized Pages projection/UI, and resume-loop persistence.
-- Canonical #62 / `v0.3/browser-e2e-executor` is the single admitted independent browser-agent rendered-journey executor lane. Its private relay/Supabase transport is executor-only and never canonical bulletin-board state.
-- Proposal/executor authors do not self-approve downstream implementation. Exact implementation heads still require a different logical AI review through #19.
+- Canonical kj2whvbzjn-hue/ai-bulletin-board#59 / `v0.3/autonomy-ops` owns lab governance, proposal/UX findings, GitHub-side baselines/budgets, sanitized Pages projection/UI, and resume-loop persistence.
+- Canonical kj2whvbzjn-hue/ai-bulletin-board#62 / `v0.3/browser-e2e-executor` is the single admitted independent browser-agent rendered-journey executor lane. Its private relay/Supabase transport is executor-only and never canonical bulletin-board state.
+- Proposal/executor authors do not self-approve downstream implementation. Exact implementation heads still require a different logical AI review through kj2whvbzjn-hue/ai-bulletin-board#19.
 - If no evidence-backed proposal, measured UX finding, admitted work, or actionable regression exists, do not generate work to keep a department busy.
 
 ## Standing Continuous Product/UX GAP_SCAN
 
-After higher-priority security, MAIN_RED, live-claim, review, and integration work, every resume/work cycle runs the standing #97 gap-finder scan against fresh current-main evidence. Re-run it after main/Pages/E2E/proposal/workstream/PR/safety/evidence-freshness transitions.
+After higher-priority security, MAIN_RED, live-claim, review, and integration work, every resume/work cycle runs the standing kj2whvbzjn-hue/ai-bulletin-board#97 gap-finder scan against fresh current-main evidence. Re-run it after main/Pages/E2E/proposal/workstream/PR/safety/evidence-freshness transitions.
 
-For each unresolved Product/UX/E2E/acceptance finding, record evidence, affected journey/state, descriptive impact, freshness, duplicate/workstream check, executable next action, and exactly one disposition: a live equivalent workstream; a fresh non-overlapping proposal routed through #16; explicit DEFERRED/REJECTED with authority and reason; or Human Required when unsafe/ambiguous. A stale, closed, deferred, or diverged PR is evidence only and never satisfies an unresolved finding. Green CI/E2E never suppresses accepted usability friction.
+For each unresolved Product/UX/E2E/acceptance finding, record evidence, affected journey/state, descriptive impact, freshness, duplicate/workstream check, executable next action, and exactly one disposition: a live equivalent workstream; a fresh non-overlapping proposal routed through kj2whvbzjn-hue/ai-bulletin-board#16; explicit DEFERRED/REJECTED with authority and reason; or Human Required when unsafe/ambiguous. A stale, closed, deferred, or diverged PR is evidence only and never satisfies an unresolved finding. Green CI/E2E never suppresses accepted usability friction.
 
 Every scan emits both a freshness receipt and an operator-report receipt, including a no-gap scan. The role discovers/deduplicates/routes only: it does not self-admit implementation, self-review, merge, or mutate another owned lane. Use the deterministic sanitized projection in `scripts/gap_scan.py`; canonical Issue/comments and immutable refs remain source of truth.
 
@@ -143,13 +147,13 @@ Branch-green evidence does not prove sequential main integration safety.
 
 Use this only to prevent the recurring failure where an integration-ready head stalls solely because no dedicated Integration Manager session is active.
 
-**Detection trigger:** the candidate is the exact independently reviewed head, required exact-head checks are green, it is mergeable, Issue #16 is open, and canonical replay shows no live #16 owner.
+**Detection trigger:** the candidate is the exact independently reviewed head, required exact-head checks are green, it is mergeable, Issue kj2whvbzjn-hue/ai-bulletin-board#16 is open, and canonical replay shows no live kj2whvbzjn-hue/ai-bulletin-board#16 owner.
 
-**Automatic behavior:** an otherwise eligible Worker prioritizes this integration gate over unrelated spare work, posts a fresh CLAIM on #16, immediately re-fetches/replays #16, and acts only if it is the live winning owner. Re-verify exact head/base/mergeability/check/review evidence, merge exactly one head with expected-head protection, then immediately inspect the required current-main post-merge validation. RELEASE/RESULT the temporary role after that bounded integration action. Missing required validation or `MAIN_RED` stops the queue and routes a focused repair/evidence lane.
+**Automatic behavior:** an otherwise eligible Worker prioritizes this integration gate over unrelated spare work, posts a fresh CLAIM on kj2whvbzjn-hue/ai-bulletin-board#16, immediately re-fetches/replays kj2whvbzjn-hue/ai-bulletin-board#16, and acts only if it is the live winning owner. Re-verify exact head/base/mergeability/check/review evidence, merge exactly one head with expected-head protection, then immediately inspect the required current-main post-merge validation. RELEASE/RESULT the temporary role after that bounded integration action. Missing required validation or `MAIN_RED` stops the queue and routes a focused repair/evidence lane.
 
-**Safety exceptions:** no self-review; no implementation mutation while holding the integration role; no stale/changed/unreviewed head merge; no required-check bypass; no merge when another live #16 owner exists; no downstream integration through `MAIN_RED`.
+**Safety exceptions:** no self-review; no implementation mutation while holding the integration role; no stale/changed/unreviewed head merge; no required-check bypass; no merge when another live kj2whvbzjn-hue/ai-bulletin-board#16 owner exists; no downstream integration through `MAIN_RED`.
 
-This is operating/scheduling policy, not a new CLAIM semantic. Follow `protocol/GITHUB_PROTOCOL.md` for ownership/lease/replay. Initial evidence for this fallback is Issue #16 comments `5725744065` and `5725762754`; record current evidence for each use.
+This is operating/scheduling policy, not a new CLAIM semantic. Follow `protocol/GITHUB_PROTOCOL.md` for ownership/lease/replay. Initial evidence for this fallback is Issue kj2whvbzjn-hue/ai-bulletin-board#16 comments `5725744065` and `5725762754`; record current evidence for each use.
 
 ## 8. Pages/privacy acceptance
 
@@ -167,7 +171,7 @@ After one focused implementation or one substantive review/integration action:
 2. re-check the PR/Issue touched and exact current head;
 3. check whether another AI merged concurrently;
 4. check for new unreviewed current-head PRs;
-5. re-read latest #16/#19 directives;
+5. re-read latest kj2whvbzjn-hue/ai-bulletin-board#16/kj2whvbzjn-hue/ai-bulletin-board#19 directives;
 6. record PROGRESS/REVIEW/RESULT with exact SHA/evidence.
 
 If actionable work remains, return to Rule refresh automatically. Do not wait for another `再開` during the normal queue.
@@ -186,7 +190,7 @@ The canonical incident-closure record must include:
 - safety exceptions / stop conditions;
 - GitHub evidence references (Issue comments, exact PR head, checks/runs/artifacts as applicable).
 
-Until the durable rule is merged, the latest Human Owner / #16 directive is bridge authority. Do not treat a one-off manual workaround as permanent closure, and do not broaden a local mitigation into unrelated protocol changes.
+Until the durable rule is merged, the latest Human Owner / kj2whvbzjn-hue/ai-bulletin-board#16 directive is bridge authority. Do not treat a one-off manual workaround as permanent closure, and do not broaden a local mitigation into unrelated protocol changes.
 
 ## 11. Anti-loop guards
 
