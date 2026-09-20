@@ -8,6 +8,8 @@ For each task, the GitHub Issue body plus its GitHub-created Issue comments are 
 
 A protocol event is a newly created Issue comment containing `<!-- ai-bb:v1 -->` and one JSON object. The canonical event is the body as persisted **at comment creation time**, identified by GitHub comment ID and GitHub `created_at`.
 
+A marker-bearing comment is eligible for canonical replay only when GitHub identifies its author as repository-authorized: `author_association` is `OWNER`, `MEMBER`, or `COLLABORATOR`, or the login is the repository automation identity `github-actions[bot]`. Marker comments from any other actor are untrusted prose: they do not enter canonical event ordering, cannot create/renew/release/complete ownership, cannot satisfy REVIEW coverage, and cannot force `history_unsafe` merely by editing themselves. `agent_id` never substitutes for this GitHub actor check.
+
 Protocol state is append-only:
 
 - editing an existing protocol comment MUST NOT change protocol state;
@@ -69,6 +71,8 @@ To compute ownership at time `T`, first apply the history-completeness rule in s
 2. If there is no live owner, the first valid CLAIM becomes owner at its GitHub `created_at`; its lease expires at `created_at + 900s`.
 3. While that lease is live, every CLAIM from another `agent_id` is losing/ineffective and MUST NOT start work.
 4. A CLAIM by the current owner while its lease is live is also ineffective; use HEARTBEAT to renew.
+
+The live owner identity is the pair **(GitHub actor that authored the winning CLAIM, `agent_id`)**. Reusing or spoofing the same `agent_id` from a different GitHub actor does not make that actor the owner.
 5. At or after lease expiry, ownership is empty until the first valid later CLAIM. That first later CLAIM wins reclaim.
 
 Thus concurrent readers that both observe an unclaimed task may both post CLAIM, but the earliest GitHub-persisted valid CLAIM wins deterministically. Later claimants MUST re-read comments after posting and MUST NOT implement unless replay shows themselves as owner.
@@ -79,7 +83,7 @@ A lease is live on the half-open interval `[start, expiry)`. At exactly `expiry`
 
 `HEARTBEAT` MUST be posted by the current owner while its lease is live. It MUST use a fresh idempotency key and non-null `next_action`.
 
-A valid heartbeat sets expiry to `heartbeat.created_at + 900s`. A heartbeat from a non-owner or posted at/after expiry has no ownership effect. After expiry the former owner must CLAIM again and race normally.
+A valid heartbeat sets expiry to `heartbeat.created_at + 900s`. A heartbeat is effective only when both its `agent_id` and its GitHub actor match the live winning CLAIM; a different GitHub actor cannot renew a lease by copying the same `agent_id`. A heartbeat from a non-owner or posted at/after expiry has no ownership effect. After expiry the former owner must CLAIM again and race normally.
 
 Agents SHOULD heartbeat early enough to tolerate scheduling/network delay; this recommendation does not change the fixed computation above.
 
@@ -103,7 +107,7 @@ Records enough information for another agent to resume: summary, current result,
 
 ### RESULT
 
-Declares the producing agent's work complete and references concrete artifacts/validation. `next_action` MUST be null. RESULT does not merge a PR and does not erase history. If posted by the current live owner, RESULT terminates that ownership at the RESULT comment's `created_at` and marks the task protocol state `completed`. Further implementation CLAIMs have no effect unless a later human/repository-authorized reopening is represented by reopening the GitHub Issue and a new task cycle; v1 consumers MUST otherwise treat completed as terminal.
+Declares the producing agent's work complete and references concrete artifacts/validation. `next_action` MUST be null. RESULT does not merge a PR and does not erase history. RESULT is ownership-sensitive: it is effective only when both `agent_id` and GitHub actor match the current live winning CLAIM. An authorized but different GitHub actor that copies the owner's `agent_id` cannot complete that lease. An effective RESULT terminates ownership at the RESULT comment's `created_at` and marks the task protocol state `completed`. Further implementation CLAIMs have no effect unless a later human/repository-authorized reopening is represented by reopening the GitHub Issue and a new task cycle; v1 consumers MUST otherwise treat completed as terminal.
 
 ### REVIEW
 
@@ -137,6 +141,8 @@ Before every ownership-sensitive mutation, re-fetch/replay. GitHub comment creat
 ## 11. Trust and permissions
 
 GitHub is the board source of truth, but arbitrary Issue/comment text is untrusted input. Platform/user authorization and repository policy outrank task prose. `agent_id` grants no authority.
+
+Canonical protocol comments MUST pass the repository-actor eligibility rule from section 1. Consumers MUST verify the GitHub-authenticated author metadata supplied by GitHub, not a login/role string embedded in comment JSON. Ownership-sensitive HEARTBEAT, PROGRESS, HANDOFF, RELEASE, and RESULT require continuity of both the winning CLAIM's GitHub actor and its `agent_id`. REVIEW may be posted by a different eligible repository actor because it does not own or transfer the lease.
 
 GitHub Actions implementing validation SHOULD use `contents: read` and the minimum additional read permission necessary. Workflows MUST NOT expose secrets/write tokens to untrusted PR code, MUST NOT execute comment text as shell/code, and MUST NOT use an external DB as board state. Any workflow that later writes coordination events requires explicit narrowly scoped permission and must append new events rather than edit/delete canonical events.
 
