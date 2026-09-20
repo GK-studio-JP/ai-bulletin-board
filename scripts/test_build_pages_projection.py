@@ -14,10 +14,17 @@ T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 def iso(t):
     return t.isoformat().replace("+00:00", "Z")
 
-def comment(cid, seconds, payload, edited=False):
+def comment(cid, seconds, payload, edited=False, actor="repo-owner", association="OWNER"):
     created = T0 + timedelta(seconds=seconds)
     body = m.MARKER + "\n\x60\x60\x60json\n" + __import__("json").dumps(payload) + "\n\x60\x60\x60"
-    return {"id": cid, "created_at": iso(created), "updated_at": iso(created + timedelta(seconds=1) if edited else created), "body": body}
+    return {
+        "id": cid,
+        "created_at": iso(created),
+        "updated_at": iso(created + timedelta(seconds=1) if edited else created),
+        "body": body,
+        "user": {"login": actor},
+        "author_association": association,
+    }
 
 def event(kind, agent, key, next_action="work"):
     return {"type": kind, "agent_id": agent, "task": "#1", "idempotency_key": key, "summary": kind, "next_action": None if kind == "RESULT" else next_action, "artifacts": []}
@@ -28,6 +35,45 @@ issue = {"number": 1}
 bad = comment(1, 0, event("CLAIM", "a", "k1"), edited=True)
 bad["body"] = m.MARKER + "\nnot-json"
 assert m.replay(issue, [bad], T0)[0] == "history_unsafe"
+
+# Untrusted marker comments cannot mutate protocol state, even when they claim completion.
+untrusted = [
+    comment(101, 0, event("CLAIM", "spoofed", "u1"), actor="outsider", association="NONE"),
+    comment(102, 1, event("RESULT", "spoofed", "u2"), actor="outsider", association="NONE"),
+]
+state, owner, _ = m.replay(issue, untrusted, T0 + timedelta(seconds=2))
+assert (state, owner) == ("open", None)
+
+# An untrusted edited marker cannot force the canonical issue into history_unsafe.
+untrusted_edited = comment(
+    103,
+    0,
+    event("CLAIM", "spoofed", "u3"),
+    edited=True,
+    actor="outsider",
+    association="NONE",
+)
+untrusted_edited["body"] = m.MARKER + "\nnot-json"
+assert m.replay(issue, [untrusted_edited], T0 + timedelta(seconds=2))[0] == "open"
+
+# Reusing a claimed agent_id from another trusted GitHub actor cannot control that lease.
+cross_actor = [
+    comment(104, 0, event("CLAIM", "worker-1", "x1"), actor="owner-a"),
+    comment(105, 1, event("RESULT", "worker-1", "x2"), actor="owner-b"),
+]
+state, owner, _ = m.replay(issue, cross_actor, T0 + timedelta(seconds=2))
+assert (state, owner) == ("claimed", "worker-1")
+
+# Repository GitHub Actions is an explicit trusted bot path even with association NONE.
+bot_claim = comment(
+    106,
+    0,
+    event("CLAIM", "worker-bot", "bot-1"),
+    actor="github-actions[bot]",
+    association="NONE",
+)
+state, owner, _ = m.replay(issue, [bot_claim], T0 + timedelta(seconds=2))
+assert (state, owner) == ("claimed", "worker-bot")
 
 # Expired former owner cannot renew or complete after the 900-second boundary.
 comments = [
