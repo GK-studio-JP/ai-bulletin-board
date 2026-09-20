@@ -19,6 +19,8 @@ from validate_product_ux_contract import validate_records
 MARKER = "<!-- ai-bb:v1 -->"
 LEASE_SECONDS = 900
 EVENT_TYPES = {"CLAIM", "HEARTBEAT", "RELEASE", "PROGRESS", "HANDOFF", "RESULT", "REVIEW"}
+TRUSTED_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+TRUSTED_BOT_LOGINS = {"github-actions[bot]"}
 REQUIRED = {"type", "agent_id", "task", "idempotency_key", "summary", "next_action", "artifacts"}
 SAFE_ARTIFACT = re.compile(r"^(?:Issue:#?\d+|PR:#?\d+(?:@[0-9a-f]{7,40})?|commit:[0-9a-f]{7,40}|merge:[0-9a-f]{7,40}|path:[A-Za-z0-9._/\-]+|[A-Za-z0-9._/\-]+)$")
 
@@ -156,13 +158,29 @@ def _comment_ref(cid):
     return f"comment:{int(cid)}"
 
 
+def trusted_comment_actor(comment):
+    """Return the GitHub login allowed to contribute canonical protocol state."""
+    user = comment.get("user")
+    login = user.get("login") if isinstance(user, dict) else None
+    if not isinstance(login, str) or not login.strip():
+        return None
+    if login in TRUSTED_BOT_LOGINS:
+        return login
+    association = comment.get("author_association")
+    if isinstance(association, str) and association.upper() in TRUSTED_AUTHOR_ASSOCIATIONS:
+        return login
+    return None
+
+
 def replay(issue, comments, now):
     number = issue["number"]
     events = []
-    # Check edit evidence for every marker-bearing comment before parsing.
-    # An edit can make a formerly canonical event malformed/noncanonical; because
-    # this API view cannot recover its creation-time body, canonical v1 fails closed.
+    # Only repository-authorized GitHub principals participate in protocol state.
+    # Untrusted marker comments are ordinary prose and cannot force history_unsafe.
     for c in comments:
+        actor = trusted_comment_actor(c)
+        if actor is None:
+            continue
         body = c.get("body") or ""
         if MARKER not in body:
             continue
@@ -172,11 +190,12 @@ def replay(issue, comments, now):
             return "history_unsafe", None, None
         p = payload(body)
         if p is not None and canonical(p, number):
-            events.append((created, int(c["id"]), p, c))
+            events.append((created, int(c["id"]), p, c, actor))
     events.sort(key=lambda x: (x[0], x[1]))
 
     seen = {}
     owner = None
+    owner_actor = None
     expiry = None
     current_claim_ref = ""
     current_claim_at = None
@@ -199,7 +218,7 @@ def replay(issue, comments, now):
     seen_heads = set()
 
     def expire_current(expired_at):
-        nonlocal owner, expiry, current_claim_ref, current_claim_at, awaiting_reclaim
+        nonlocal owner, owner_actor, expiry, current_claim_ref, current_claim_at, awaiting_reclaim
         nonlocal prior_expired_owner, prior_expired_claim_ref, prior_expired_at
         if owner is not None:
             prior_expired_owner = owner
@@ -207,11 +226,12 @@ def replay(issue, comments, now):
             prior_expired_at = expired_at
             awaiting_reclaim = True
         owner = None
+        owner_actor = None
         expiry = None
         current_claim_ref = ""
         current_claim_at = None
 
-    for created, cid, p, c in events:
+    for created, cid, p, c, actor in events:
         key = p["idempotency_key"]
         normalized = json.dumps(p, sort_keys=True, separators=(",", ":"))
         if key in seen:
@@ -227,6 +247,7 @@ def replay(issue, comments, now):
             expire_current(expiry)
 
         live = owner is not None and expiry is not None
+        same_owner = live and p["agent_id"] == owner and actor == owner_actor
         heads = [x for x in p.get("artifacts", []) if re.fullmatch(r"PR:#?\d+@[0-9a-f]{7,40}", x)]
         if heads:
             if typ == "REVIEW":
@@ -234,7 +255,7 @@ def replay(issue, comments, now):
                     author = head_authors.get(head)
                     if author and p["agent_id"] != author:
                         reviewed_heads.add(head)
-            elif typ in {"PROGRESS", "HANDOFF", "RESULT"} and live and p["agent_id"] == owner:
+            elif typ in {"PROGRESS", "HANDOFF", "RESULT"} and same_owner:
                 for head in heads:
                     if head in seen_heads:
                         continue
@@ -250,6 +271,7 @@ def replay(issue, comments, now):
                     reclaim_at = created
                     awaiting_reclaim = False
                 owner = p["agent_id"]
+                owner_actor = actor
                 current_claim_ref = _comment_ref(cid)
                 current_claim_at = created
                 expiry = created + timedelta(seconds=LEASE_SECONDS)
@@ -258,29 +280,33 @@ def replay(issue, comments, now):
                 owner_next_action = p.get("next_action") or ""
                 released = False
         elif typ == "HEARTBEAT":
-            if live and p["agent_id"] == owner:
+            if same_owner:
                 expiry = created + timedelta(seconds=LEASE_SECONDS)
                 last_lease_expiry = expiry
                 last_owner_activity_at = created
                 owner_next_action = p.get("next_action") or owner_next_action
         elif typ in {"PROGRESS", "HANDOFF"}:
-            if live and p["agent_id"] == owner:
+            if same_owner:
                 last_owner_activity_at = created
                 owner_next_action = p.get("next_action") or owner_next_action
         elif typ == "RELEASE":
-            if live and p["agent_id"] == owner:
+            if same_owner:
                 last_owner_activity_at = created
                 owner_next_action = p.get("next_action") or owner_next_action
-                owner = expiry = None
+                owner = None
+                owner_actor = None
+                expiry = None
                 current_claim_ref = ""
                 current_claim_at = None
                 last_lease_expiry = None
                 released = True
         elif typ == "RESULT":
-            if live and p["agent_id"] == owner:
+            if same_owner:
                 last_owner_activity_at = created
                 completed = True
-                owner = expiry = None
+                owner = None
+                owner_actor = None
+                expiry = None
                 current_claim_ref = ""
                 current_claim_at = None
                 last_lease_expiry = None
