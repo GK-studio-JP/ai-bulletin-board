@@ -2,7 +2,7 @@ name: Validate AI Bulletin Board comment
 
 on:
   issue_comment:
-    types: [created, edited]
+    types: [created, edited, deleted]
 
 permissions:
   contents: read
@@ -20,11 +20,36 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: printf '%s' "$COMMENT_BODY" | python3 scripts/validate_ai_bb_comment.py --issue-number "$ISSUE_NUMBER"
 
-  audit-edited:
-    if: github.event.action == 'edited' && contains(github.event.comment.body, '<!-- ai-bb:v1 -->')
+  audit-mutated:
+    if: >-
+      (github.event.action == 'edited' &&
+       (contains(github.event.comment.body, '<!-- ai-bb:v1 -->') ||
+        contains(github.event.changes.body.from, '<!-- ai-bb:v1 -->'))) ||
+      (github.event.action == 'deleted' &&
+       contains(github.event.comment.body, '<!-- ai-bb:v1 -->'))
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
-      - name: Audit warning only
+      - name: Append canonical mutation audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTION: ${{ github.event.action }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          CURRENT_BODY: ${{ github.event.comment.body }}
+          PREVIOUS_BODY: ${{ github.event.changes.body.from }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
-          echo 'WARNING: edited ai-bb:v1 comment is audit evidence only.'
-          echo 'It MUST NOT be treated as a new or mutated canonical protocol event.'
+          set -euo pipefail
+          previous_sha="$(printf '%s' "$PREVIOUS_BODY" | sha256sum | awk '{print $1}')"
+          current_sha="$(printf '%s' "$CURRENT_BODY" | sha256sum | awk '{print $1}')"
+          if [ "$ACTION" = "deleted" ]; then
+            audit_type="CANONICAL_COMMENT_DELETED"
+          else
+            audit_type="CANONICAL_COMMENT_EDITED"
+          fi
+          audit_body="$(printf '<!-- ai-bb-audit:v1 -->\n```json\n{"type":"%s","comment_id":%s,"previous_body_sha256":"sha256:%s","current_body_sha256":"sha256:%s"}\n```' "$audit_type" "$COMMENT_ID" "$previous_sha" "$current_sha")"
+          gh api --method POST "repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" --raw-field body="$audit_body"
