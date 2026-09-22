@@ -63,7 +63,7 @@ footer{margin-top:20px;color:#657188;font-size:.86rem}.mobile-cards{display:none
 <footer>Generated from an explicit sanitized projection. No GitHub token, cookie, secret, raw Issue body, or authenticated page content is required by this client.</footer>
 </div>
 <script>
-const issueBase='https://github.com/kj2whvbzjn-hue/ai-bulletin-board/issues/';
+const issueBase='https://github.com/GK-studio-JP/ai-bulletin-board/issues/';
 const safeText=v=>Array.isArray(v)?v.join(', '):(v??'');
 function stateOf(row){return String(row.state||'open').toLowerCase()}
 function taskLink(row){const a=document.createElement('a');a.className='task-link';const label=[safeText(row.task),safeText(row.title)].filter(Boolean).join(' — ');a.textContent=label||'Task';const n=String(row.task||'').match(/\d+/);if(n)a.href=issueBase+n[0];else a.removeAttribute('href');return a}
