@@ -120,8 +120,6 @@ def payload(body: str):
     tail = body.split(MARKER, 1)[1]
     m = re.search(r"```json\s*(\{.*?\})\s*```", tail, re.S | re.I)
     if not m:
-        m = re.search(r"(\{.*\})", tail, re.S)
-    if not m:
         return None
     try:
         value = json.loads(m.group(1))
