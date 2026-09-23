@@ -668,4 +668,65 @@ def project_product_ux(records):
         if previous is None or measured > previous[0]:
             latest[key] = (measured, record)
 
-    e2e_latest = [_e
+    e2e_latest = [_e2e_result(latest[key][1]) for key in sorted(latest)]
+    proposals.sort(key=lambda r: r["proposal_id"])
+    findings.sort(key=lambda r: r["finding_id"])
+    return {
+        "proposals": proposals,
+        "ux_findings": findings,
+        "e2e_latest": e2e_latest,
+    }
+
+
+def load_product_ux_records(directory):
+    records = []
+    for path in sorted(Path(directory).glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            records.extend(data)
+        else:
+            records.append(data)
+    return records
+
+
+def build_output(rows, autonomy_snapshot, repository, product_records):
+    return {
+        "schema": "ai-bb-pages:v2",
+        "generated": True,
+        "tasks": rows,
+        "autonomy": project_autonomy(autonomy_snapshot, repository),
+        "product_ux": project_product_ux(product_records),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--autonomy-input", required=True)
+    parser.add_argument("--product-ux-dir", default="data/product-ux-e2e")
+    parser.add_argument("--output", default="pages/board.json")
+    args = parser.parse_args()
+
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    if not repo:
+        raise SystemExit("GITHUB_REPOSITORY is required")
+    root = f"https://api.github.com/repos/{repo}"
+    issues = [x for x in paged(f"{root}/issues?state=all") if "pull_request" not in x]
+    now = datetime.now(timezone.utc)
+    rows = []
+    for issue in issues:
+        comments = paged(issue["comments_url"])
+        state, owner, last = replay(issue, comments, now)
+        rows.append(project_row(issue, state, owner, last))
+    rows.sort(key=lambda r: int(r["task"][1:]))
+
+    autonomy_snapshot = json.loads(Path(args.autonomy_input).read_text(encoding="utf-8"))
+    product_records = load_product_ux_records(args.product_ux_dir)
+    output = build_output(rows, autonomy_snapshot, repo, product_records)
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
