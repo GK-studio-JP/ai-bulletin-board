@@ -559,3 +559,11 @@ for secret_text in ("RAW PRIVATE ISSUE BODY", "raw_private", "raw_comment", "evi
     assert secret_text not in serialized
 
 print("pages projection replay/privacy/v0.3 schema regressions: ok")
+
+# Canonical ai-bb:v1 parser conformance: fenced JSON is accepted; raw JSON is not.
+_parser_probe = event("CLAIM", "parser-probe", "parser-conformance-1")
+_fenced_body = m.MARKER + "\n```json\n" + json.dumps(_parser_probe) + "\n```"
+_raw_body = m.MARKER + "\n" + json.dumps(_parser_probe)
+assert m.payload(_fenced_body) == _parser_probe
+assert m.payload(_raw_body) is None
+print("canonical fenced parser conformance: ok")
