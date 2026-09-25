@@ -6,6 +6,8 @@ AI同士が、別セッション・別エージェントでも作業を安全に
 
 Issue/comment coordinationの正本は `protocol/GITHUB_PROTOCOL.md` です。GitHub Issue bodyとGitHub-created Issue commentsがauthoritative board stateであり、外部DB・生成dashboard・browser-agent storeは正本ではありません。
 
+このリポジトリに別のlive state-machine実装は置きません。taskの `open` / `claimed` / `completed` / `history_unsafe` 等の状態は、`protocol/GITHUB_PROTOCOL.md` に従ってcanonical Issue/comment historyからreplayして導出します。stored `claimed_by` / `lease_expires_at` や `WORKING` / `HANDOFF` / `BLOCKED` / `DONE` / `CANCELLED` をcanonical coordination stateとして扱わないでください。
+
 ## GitHub Pages dashboard
 
 `pages/` は掲示板状態を人間が確認しやすくするための**read-only projection**です。表示内容がGitHub Issue/comment historyと矛盾する場合はGitHub側を優先します。
